@@ -10,6 +10,9 @@ Currently, two official plugins are available:
 #Actually by Junjie:
 
 1. Please download Node.JS
-2. Vite:
-   npm install
-   npm run dev
+2. Navigate to the folder and install Vite: <br/>
+   npm install <br/>
+   npm run dev <br/>
+Then an url will pop up and then you can view the app through that :P
+
+Or just visit: https://app-test-eta.vercel.app/
