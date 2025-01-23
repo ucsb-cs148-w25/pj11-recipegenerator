@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 
 export default function ProfilePage() {
   const savedRecipes = [
@@ -18,14 +18,16 @@ export default function ProfilePage() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>User Profile</Text>
-      
+      <Image source={require('./../assets/images/defaultprofilepic.png')} style={styles.image} />
       <View style={styles.profileCard}>
-        <Text style={styles.subtitle}>Username: HAHA</Text>
-        <Text style={styles.subtitle}>Email: HAHA@example.com</Text>
-        <View style={styles.statsContainer}>
+        <Text style={styles.name}>Taylor Swift</Text>
+        <Text style={styles.username}>@taylorswift</Text>
+        <Text style={styles.bio}>I love fries and burgers</Text>
+
+        {/* <View style={styles.statsContainer}>
           <Text style={styles.statText}>Saved: {savedRecipes.length}</Text>
-        </View>
+        </View> */}
+        {/* personally not sure if I like this feature bc its kinda clutter, but if we wanna add it back ill design a more intuitive way to display recipe count - Christy */}
       </View>
 
       <Text style={styles.sectionTitle}>Saved Recipes</Text>
@@ -60,31 +62,10 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#E0FFFF',
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: '#088F8F',
-    letterSpacing: 0.5,
-  },
   profileCard: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
+    padding: 10,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  subtitle: { 
-    fontSize: 18, 
-    marginBottom: 10,
-    color: '#666',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 24,
@@ -168,5 +149,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  image: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: 'center',
+    padding: 10,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    fontFamily: "MoulRegular",
+    // why is this not working???
+  },
+  username: {
+    fontSize: 16,
+    marginBottom: 5,
+    fontWeight: 'bold',
+    color: "#1A535C",
+  },
+  bio: {
+    fontSize: 16,
+    color: '#1A535C',
+    marginBottom: 10,
   },
 });
