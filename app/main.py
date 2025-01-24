@@ -1,16 +1,38 @@
 from fastapi import FastAPI, HTTPException
 from typing import List
 from pydantic import BaseModel
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from bson import ObjectId
+from app.routers import *
+
+
+uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
+
+# Create a new client and connect to the server
+client = MongoClient(uri, server_api=ServerApi('1'))
 
 app = FastAPI()
-
-# To be replaced by actual MongoDB
-fridge = {}
-
 
 class Item(BaseModel):
     name: str
     quantity: int
+
+
+def unpack_item(item):
+    return {
+        "id": str(item["_id"]),
+        "name": item["name"],
+        "quantity": item["quantity"],
+    }
+
+# Test the MongoDB connection
+try:
+    client.admin.command("ping")
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(f"Error connecting to MongoDB: {e}")
+
 
 # Get all items in the fridge
 @app.get("/fridge")
