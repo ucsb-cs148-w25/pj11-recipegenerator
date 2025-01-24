@@ -20,7 +20,7 @@ App Type: Cross-platform mobile application
 
 ### Tech Stack:
 - Frontend: React Native with Expo
-- Backend: Node.js
+- Backend: FastAPI
 - Database: MongoDB
 - Authentication: Google OAuth
 
