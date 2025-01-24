@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Button, ScrollView } from "react-native";
+import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Button, ScrollView } from "react-native";
 
 export default function FridgePage() {
   const [inventories, setInventories] = useState({
@@ -40,7 +40,7 @@ export default function FridgePage() {
               style={styles.removeButton}
               onPress={() => removeIngredient(item, category)}
             >
-              <Text style={styles.buttonText}>Remove</Text>
+              <Image source={require('./../assets/images/minus1.png')}/>
             </TouchableOpacity>
           </View>
         )}
@@ -57,7 +57,7 @@ export default function FridgePage() {
           style={[styles.addButton, { opacity: selectedCategory === category ? 1 : 0.5 }]}
           onPress={selectedCategory === category ? addIngredient : undefined}
         >
-          <Text style={styles.buttonText}>Add</Text>
+          <Image source={require('./../assets/images/add3.png')}/>
         </TouchableOpacity>
       </View>
     </View>
@@ -117,13 +117,11 @@ const styles = StyleSheet.create({
     color: '#088F8F',
   },
   removeButton: {
-    backgroundColor: '#088F8F',
     padding: 8,
     paddingHorizontal: 15,
     borderRadius: 25,
   },
   addButton: {
-    backgroundColor: '#088F8F',
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
