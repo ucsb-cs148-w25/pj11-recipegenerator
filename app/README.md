@@ -10,6 +10,8 @@ Also, there might be leftover data from testing.
 
 Some edge cases in `remove` need to be handled.
 
+Google OAuth code available in \router, but need to be incorporated into main.py
+
 ### Usage
 
 Get everything into your local folder. CD into the folder "app".
