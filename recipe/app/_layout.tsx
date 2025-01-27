@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -7,9 +8,16 @@ import RecipePage from "./recipe";
 import ProfilePage from "./profile";
 import SettingsPage from "./settings";
 
+import Login, { User } from "./login";
+
 const Tab = createBottomTabNavigator();
 
 export default function RootLayout() {
+  const [user, setUser] = useState<User | null>(null);
+
+  if (!user) {
+    return <Login setUser={setUser} />
+  }
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
