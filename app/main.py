@@ -54,7 +54,8 @@ def add_item(item: Item):
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
-    return {"message": f"{item.quantity} {item.name}(s) added to the fridge.", }
+    all_items_fridge = get_items()
+    return {"message": f"{item.quantity} {item.name}(s) added to the fridge.", "all_items": all_items_fridge}
 
 # Remove an item from the fridge
 @app.post("/fridge/remove")
