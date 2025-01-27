@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Image, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 
 export default function RecipePage() {
   const generateRecipes = () => {
@@ -7,20 +7,27 @@ export default function RecipePage() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Recipes</Text>
+      <Text style={styles.title}>Saved Recipes</Text>
       
       {/* Scrollable recipe container */}
       <ScrollView style={styles.recipesContainer} contentContainerStyle={styles.recipesContentContainer}>
-        {/* Placeholder recipe cards - these will be replaced with actual recipe data */}
         <View style={styles.recipeCard}>
-          <Text style={styles.recipeTitle}>Recipe Name</Text>
-          <Text style={styles.recipeDescription}>
+          <View style={styles.header}>
+            <Image source={require('../assets/images/emptyfavorite.png')} style={styles.favorite}/>
+            <Text style={styles.recipeTitle}>Omlette</Text>
+            <Image source={require('../assets/images/toggledown.png')} style={styles.toggle}/>
+          </View>
+          {/* <Text style={styles.recipeDescription}>
             This is where the recipe description and ingredients will appear.
-          </Text>
+          </Text> */}
         </View>
-        
+
         <View style={styles.recipeCard}>
-          <Text style={styles.recipeTitle}>Recipe Name</Text>
+          <View style={styles.header}>
+            <Image source={require('../assets/images/favorited.png')} style={styles.favorite}/>
+            <Text style={styles.recipeTitle}>Fried Rice with Spam</Text>
+            <Image source={require('../assets/images/toggleup.png')} style={styles.toggle}/>
+          </View>
           <Text style={styles.recipeDescription}>
             This is where the recipe description and ingredients will appear.
           </Text>
@@ -50,7 +57,7 @@ export default function RecipePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E0FFFF',
+    color: '#1A535C',
   },
   title: {
     fontSize: 32,
@@ -72,14 +79,17 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 20,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row', 
+  },
+  favorite: {
+    width: 24,
+    height: 24,
+    marginRight: 10,
+  },
+  toggle: {
+    marginLeft: 'auto',
   },
   recipeTitle: {
     fontSize: 20,
