@@ -1,54 +1,79 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
 
-export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+import * as Google from "expo-auth-session/providers/google";
+import * as SecureStore from "expo-secure-store";
 
-  const handleLogin = async () => {
-    setLoading(true);
+export type User = {
+  token?: string;
+  guest?: boolean;
+};
 
+interface LoginProps {
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+}
+
+export default function Login({ setUser }: LoginProps) {
+  //google login
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com",
+  });
+
+  useEffect(() => {
+    if (response?.type === "success" && response.authentication) {
+      const { authentication } = response;
+      handleGoogleLogin(authentication.accessToken);
+    }
+  }, [response]);
+
+  const handleGoogleLogin = async (accessToken: string) => {
     try {
-      const response = await fetch("http://localhost:5000/login", {
+      const response = await fetch("http://localhost:5000/google-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ accessToken }),
       });
 
       const data = await response.json();
       if (response.ok) {
-        // Save token securely (e.g., SecureStore)
+        await SecureStore.setItemAsync("token", data.token);
+        setUser({ token: data.token });
         Alert.alert("Success", "Login successful!");
-        console.log("Token:", data.token);
       } else {
-        Alert.alert("Error", data.error || "Login failed");
+        Alert.alert("Error", data.error || "Google login failed");
       }
     } catch (err) {
-      Alert.alert("Error", "Something went wrong");
-    } finally {
-      setLoading(false);
+      Alert.alert("Error", "Something went wrong with Google login");
     }
   };
+
+  const handleGuestLogin = () => {
+    setUser({ guest: true });
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
-      <TextInput
+      {/* <TextInput
         style={styles.input}
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
-      />
-      <TextInput
+      /> */}
+      {/* <TextInput
         style={styles.input}
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-      />
-      <Button title={loading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loading} />
+      /> */}
+      <View style={styles.googleButton}>
+        <Button title="Login with Google" onPress={() => promptAsync()} disabled={!request} />
+      </View>
+      <View style={styles.guestButton}>
+        <Button title="Continue as guest" onPress={handleGuestLogin} />
+      </View>
     </View>
   );
 }
@@ -63,4 +88,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
   },
+  googleButton: {
+    width: "80%",
+    marginBottom: 10,
+  },
+  guestButton: {
+    width: "auto",
+    marginBottom: 10,
+  }
 });
