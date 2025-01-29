@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
-
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
 import * as Google from "expo-auth-session/providers/google";
 import * as SecureStore from "expo-secure-store";
 
@@ -14,7 +13,6 @@ interface LoginProps {
 }
 
 export default function Login({ setUser }: LoginProps) {
-  //google login
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com",
   });
@@ -49,52 +47,78 @@ export default function Login({ setUser }: LoginProps) {
 
   const handleGuestLogin = () => {
     setUser({ guest: true });
-  }
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
-      {/* <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-      /> */}
-      {/* <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      /> */}
-      <View style={styles.googleButton}>
-        <Button title="Login with Google" onPress={() => promptAsync()} disabled={!request} />
-      </View>
-      <View style={styles.guestButton}>
-        <Button title="Continue as guest" onPress={handleGuestLogin} />
-      </View>
+      <Image source={require("./../assets/images/icon.png")} style={styles.logo} />
+      <Text style={styles.title}>Recipe Generator</Text>
+      <Text style={styles.subtitle}>Your personal recipe assistant</Text>
+  
+
+      <TouchableOpacity
+        style={[styles.button, styles.googleButton]}
+        onPress={() => promptAsync()}
+        disabled={!request}
+      >
+        <Image source={require("./../assets/images/google-icon.png")} style={styles.buttonIcon} />
+        <Text style={styles.buttonText}>Login with Google</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={[styles.button, styles.guestButton]} onPress={handleGuestLogin}>
+        <Text style={styles.buttonText}>Continue as Guest</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
-  // input: {
-  //   width: "80%",
-  //   padding: 10,
-  //   marginVertical: 10,
-  //   borderWidth: 1,
-  //   borderRadius: 5,
-  // },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#E0FFFF", // Match fridge.tsx background color
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#088F8F",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 40,
+  },
+  button: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    width: "80%",
+    justifyContent: "center",
+    marginBottom: 15,
+  },
   googleButton: {
-    width: 200,
-    height: 10,
-    marginBottom: 30,
+    backgroundColor: "#4285F4",
   },
   guestButton: {
-    width: 200,
-    height: 10,
-  }
+    backgroundColor: "#666",
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    marginLeft: 10,
+  },
+  buttonIcon: {
+    width: 20,
+    height: 20,
+  },
 });
