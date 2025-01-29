@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./recipe/assets/app_icon/icon.png",
-    "scheme": "https://auth.expo.io/@your-username/StickerSmash",
+    "scheme": "https://auth.expo.io/@expoid/StickerSmash",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -62,8 +62,8 @@
     },
     "extra": {
       "google": {
-        "iosClientId": "YOUR_IOS_CLIENT_ID",
-        "androidClientId": "YOUR_ANDROID_CLIENT_ID"
+        "iosClientId": "http://localhost:8000",
+        "androidClientId": "http://localhost:8000"
       }
     }
   }
