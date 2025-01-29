@@ -33,17 +33,13 @@ export default function FridgePage() {
   };
 
   const updateQuantity = (item: string, category: keyof typeof inventories, value: number) => {
-    if (value <= 0) {
-      removeIngredient(item, category);
-    } else {
-      setInventories({
-        ...inventories,
-        [category]: {
-          ...inventories[category],
-          [item]: value,
-        },
-      });
-    }
+    setInventories({
+      ...inventories,
+      [category]: {
+        ...inventories[category],
+        [item]: isNaN(value) ? 0 : value,
+      },
+    });
   };
 
   const renderCategory = (title: string, category: keyof typeof inventories) => (
@@ -65,9 +61,9 @@ export default function FridgePage() {
               <TextInput
                 style={styles.quantityInput}
                 keyboardType="numeric"
-                value={String(inventories[category][item])}
+                value={inventories[category][item] === 0 ? "" : String(inventories[category][item])}
                 onChangeText={(text) => {
-                  const num = parseInt(text) || 0;
+                  const num = text === "" ? 0 : parseInt(text) || 0;
                   updateQuantity(item, category, num);
                 }}
               />
