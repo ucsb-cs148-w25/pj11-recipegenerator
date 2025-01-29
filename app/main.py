@@ -5,7 +5,8 @@ from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 
 # MongoDB URI
-uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
+# uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
+uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
 client = MongoClient(uri, server_api=ServerApi('1'))
 
 # Connect to the database and collection
