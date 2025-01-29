@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#E0FFFF", // Match fridge.tsx background color
+    backgroundColor: "#E0FFFF",
   },
   logo: {
     width: 100,
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   googleButton: {
-    backgroundColor: "#4285F4",
+    backgroundColor: "#088F8F",
   },
   guestButton: {
     backgroundColor: "#666",
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   buttonIcon: {
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
   },
 });
