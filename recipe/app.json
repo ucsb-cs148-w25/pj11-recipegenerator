@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./recipe/assets/app_icon/icon.png",
-    "scheme": "myapp",
+    "scheme": "https://auth.expo.io/@your-username/StickerSmash",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -59,6 +59,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "google": {
+        "iosClientId": "YOUR_IOS_CLIENT_ID",
+        "androidClientId": "YOUR_ANDROID_CLIENT_ID"
+      }
     }
   }
 }
