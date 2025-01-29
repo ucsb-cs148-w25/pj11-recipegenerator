@@ -81,19 +81,20 @@ export default function Login({ setUser }: LoginProps) {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
-  input: {
-    width: "80%",
-    padding: 10,
-    marginVertical: 10,
-    borderWidth: 1,
-    borderRadius: 5,
-  },
+  // input: {
+  //   width: "80%",
+  //   padding: 10,
+  //   marginVertical: 10,
+  //   borderWidth: 1,
+  //   borderRadius: 5,
+  // },
   googleButton: {
-    width: "80%",
-    marginBottom: 10,
+    width: 200,
+    height: 10,
+    marginBottom: 30,
   },
   guestButton: {
-    width: "auto",
-    marginBottom: 10,
+    width: 200,
+    height: 10,
   }
 });
