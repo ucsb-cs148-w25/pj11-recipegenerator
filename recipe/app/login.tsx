@@ -13,8 +13,11 @@ interface LoginProps {
 }
 
 export default function Login({ setUser }: LoginProps) {
+  const redirectUri = 'http://localhost:8000';
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com",
+    redirectUri,
   });
 
   useEffect(() => {
