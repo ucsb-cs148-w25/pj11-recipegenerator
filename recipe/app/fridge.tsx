@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Button, ScrollView } from "react-native";
+import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
 
 export default function FridgePage() {
   const [inventories, setInventories] = useState({
-    vegetables: ["Carrots", "Broccoli"],
-    dairy: ["Milk", "Eggs", "Butter"],
-    frozen: ["Ice Cream", "Frozen Peas"]
+    vegetables: { Carrots: 1, Broccoli: 2 },
+    dairy: { Milk: 1, Eggs: 12, Butter: 1 },
+    frozen: { "Ice Cream": 1, "Frozen Peas": 1 },
   });
   const [newIngredient, setNewIngredient] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"vegetables" | "dairy" | "frozen">("vegetables");
@@ -14,16 +14,31 @@ export default function FridgePage() {
     if (newIngredient.trim()) {
       setInventories({
         ...inventories,
-        [selectedCategory]: [...inventories[selectedCategory], newIngredient.trim()]
+        [selectedCategory]: {
+          ...inventories[selectedCategory],
+          [newIngredient.trim()]: 1,
+        },
       });
       setNewIngredient("");
     }
   };
 
-  const removeIngredient = (item: string, category: "vegetables" | "dairy" | "frozen") => {
+  const removeIngredient = (item: string, category: keyof typeof inventories) => {
+    const updatedCategory = { ...inventories[category] };
+    delete updatedCategory[item];
     setInventories({
       ...inventories,
-      [category]: inventories[category].filter((ingredient) => ingredient !== item)
+      [category]: updatedCategory,
+    });
+  };
+
+  const updateQuantity = (item: string, category: keyof typeof inventories, value: number) => {
+    setInventories({
+      ...inventories,
+      [category]: {
+        ...inventories[category],
+        [item]: isNaN(value) ? 0 : value,
+      },
     });
   };
 
@@ -31,17 +46,31 @@ export default function FridgePage() {
     <View style={styles.categoryContainer}>
       <Text style={styles.categoryTitle}>{title}</Text>
       <FlatList
-        data={inventories[category]}
-        keyExtractor={(item, index) => `${category}-${index}`}
+        data={Object.keys(inventories[category])}
+        keyExtractor={(item) => item}
         renderItem={({ item }) => (
           <View style={styles.ingredientItem}>
-            <Text style={styles.ingredientText}>{item}</Text>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => removeIngredient(item, category)}
-            >
-              <Image source={require('./../assets/images/minus1.png')}/>
+            <TouchableOpacity onPress={() => removeIngredient(item, category)}>
+              <Text style={styles.removeButton}>×</Text>
             </TouchableOpacity>
+            <Text style={styles.ingredientText}>{item}</Text>
+            <View style={styles.quantityContainer}>
+              <TouchableOpacity onPress={() => updateQuantity(item, category, inventories[category][item] - 1)}>
+                <Text style={styles.button}>-</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.quantityInput}
+                keyboardType="numeric"
+                value={inventories[category][item] === 0 ? "" : String(inventories[category][item])}
+                onChangeText={(text) => {
+                  const num = text === "" ? 0 : parseInt(text) || 0;
+                  updateQuantity(item, category, num);
+                }}
+              />
+              <TouchableOpacity onPress={() => updateQuantity(item, category, inventories[category][item] + 1)}>
+                <Text style={styles.button}>+</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       />
@@ -57,7 +86,7 @@ export default function FridgePage() {
           style={[styles.addButton, { opacity: selectedCategory === category ? 1 : 0.5 }]}
           onPress={selectedCategory === category ? addIngredient : undefined}
         >
-          <Image source={require('./../assets/images/add3.png')}/>
+          <Image source={require("./../assets/images/add3.png")} />
         </TouchableOpacity>
       </View>
     </View>
@@ -77,22 +106,22 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: '#E0FFFF',
+    backgroundColor: "#E0FFFF",
   },
   title: { 
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 10,
-    color: '#088F8F',
+    color: "#088F8F",
     letterSpacing: 0.5,
   },
   input: { 
     borderWidth: 1,
-    borderColor: '#088F8F',
+    borderColor: "#088F8F",
     padding: 10,
     marginVertical: 10,
     borderRadius: 5,
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   ingredientItem: {
     flexDirection: "row",
@@ -100,57 +129,56 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 15,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
   },
   ingredientText: {
     fontSize: 16,
-    color: '#088F8F',
+    color: "#088F8F",
   },
-  removeButton: {
-    padding: 8,
-    paddingHorizontal: 15,
-    borderRadius: 25,
+  quantityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  button: {
+    fontSize: 20,
+    color: "#088F8F",
+    paddingHorizontal: 10,
+  },
+  quantityInput: {
+    width: 40,
+    height: 30,
+    borderWidth: 1,
+    borderColor: "#088F8F",
+    textAlign: "center",
+    marginHorizontal: 5,
+    borderRadius: 5,
+    backgroundColor: "white",
   },
   addButton: {
     padding: 15,
     borderRadius: 25,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
   categoryContainer: {
     marginBottom: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 15,
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
@@ -158,17 +186,16 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 24,
     fontWeight: "600",
-    color: '#088F8F',
+    color: "#088F8F",
     marginBottom: 10,
   },
   addSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   selectedInput: {
-    borderColor: '#088F8F',
+    borderColor: "#088F8F",
     borderWidth: 2,
   },
 });
-

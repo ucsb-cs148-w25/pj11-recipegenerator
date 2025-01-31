@@ -1,6 +1,6 @@
-# Date of Retrospective: 01/24/25
+# Date of Retrospective: 01/27/25
 
-* Led by: Jiaqi
+* Led by: Shiyuan
 * Present: Jiaqi Alex Andrew Amber Junjie Christy Shiyuan
 
 Start\
@@ -25,3 +25,7 @@ Measurement: Everyone has a similar understanding on where we are as a group. We
 
 ## Retro Assessment
 We used the Start/Stop/Continue process, and we believe it was quite effective. It allowed us to gain a clearer understanding of where each group member is facing challenges and where they're excelling. Many valuable points were raised during the discussion, and it was notable that several comments were similar across the team. This indicates that we share common concerns and recognize the same strengths within the group. One suggestion for the next retro leader would be to allocate more time for the "Stop" section. Teams often focus less on this compared to "Start" or "Continue," but diving deeper into what we should stop doing can be crucial for improving our workflow.
+
+
+## Outcome
+The group successfully conducted daily check-ins on Slack/iMessages, which significantly improved communication. Team members were better aligned on progress and blockers, fostering a more cohesive and efficient workflow. Additionally, backend work has commenced, and frontend efforts are continuing steadily. The retrospective insights have motivated the team to prioritize addressing workflow inefficiencies while leveraging the strengths highlighted in the discussion. Future retrospectives will aim to dive deeper into the "Stop" section to identify and resolve pain points.

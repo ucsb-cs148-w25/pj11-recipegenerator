@@ -31,7 +31,8 @@ from app.models import (
 )
 
 # MongoDB URI
-uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/?retryWrites=true&w=majority"
+# uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
+uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
 client = MongoClient(uri, server_api=ServerApi('1'))
 
 # Connect to the database and collection
