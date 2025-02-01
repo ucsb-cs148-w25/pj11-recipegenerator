@@ -1,50 +1,79 @@
-from fastapi import FastAPI, Depends, Request
-from fastapi.responses import RedirectResponse
-from fastapi.security import OAuth2PasswordBearer
-import requests
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import httpx
+from datetime import datetime, timedelta, timezone
 import jwt
+from datetime import datetime, timedelta
 
 app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Replace these with your own values from the Google Developer Console
-GOOGLE_CLIENT_ID = "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
-GOOGLE_REDIRECT_URI = "http://localhost:8000"
+# Allow requests from anywhere (development convenience).
+# In production, configure this carefully or set a specific domain.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Google OAuth test!"}
+# Secret key for signing your JWT
+# Replace with a secure, random value in production (from an .env file, etc.)
+SECRET_KEY = "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"
+ALGORITHM = "HS256"
 
-@app.get("/login/google")
-async def login_google(request: Request):
-    google_oauth_url = (
-        "https://accounts.google.com/o/oauth2/auth"
-        f"?response_type=code"
-        f"&client_id={GOOGLE_CLIENT_ID}"
-        f"&redirect_uri={GOOGLE_REDIRECT_URI}"
-        "&scope=openid%20profile%20email"
-        "&access_type=offline"
-    )
-    return RedirectResponse(google_oauth_url)
+# The data we expect in the request body
+class GoogleLoginPayload(BaseModel):
+    accessToken: str
 
-@app.get("/auth/google")
-async def auth_google(code: str):
-    token_url = "https://accounts.google.com/o/oauth2/token"
-    data = {
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
-        "grant_type": "authorization_code",
+@app.post("/google-login")
+async def google_login(payload: GoogleLoginPayload):
+    """
+    Input: the user's Google access token from the frontend.
+    Output: JSONResponse containing a custom JWT token for the user 
+            if success, or a error if user is invalid or expired.
+    """
+
+    # Verify token with Google
+    user_info = await verify_google_access_token(payload.accessToken)
+    if not user_info:
+        return JSONResponse(
+            status_code=401, 
+            content={"error": "Invalid or expired Google access token"}
+        )
+
+    # Build JWT token: user ID, email, and expiration time(24 hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    payload_data = {
+        "sub": user_info["id"],      # "subject": the user ID from Google
+        "email": user_info["email"],
+        "exp": expires_at
     }
-    response = requests.post(token_url, data=data)
-    access_token = response.json().get("access_token")
-    user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
-    return user_info.json()
+    # Sign the token with your SECRET_KEY
+    my_jwt_token = jwt.encode(payload_data, SECRET_KEY, algorithm=ALGORITHM)
 
+    # 3) Return the token to the client
+    return {
+        "token": my_jwt_token
+    }
 
-if __name__ == "__main__":
-    import uvicorn
+async def verify_google_access_token(access_token: str):
+    """
+    Make a request to Google's UserInfo endpoint to validate the token.
+    If valid, returns a dict with user info (e.g. "id", "email", "name", etc.).
+    If invalid, returns None.
+    """
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    async with httpx.AsyncClient() as client:
+        # Google has different userinfo endpoints; v2 or v3. Either works.
+        # This example uses the v2 endpoint.
+        resp = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+
+    if resp.status_code == 200:
+        return resp.json()
+    return None
