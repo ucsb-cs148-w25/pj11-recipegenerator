@@ -19,12 +19,12 @@ function Recipe({ title, description }) {
     <View style={styles.recipeCard}>
       <View style={styles.header}>
         <Image
-          source={require("../assets/images/emptyfavorite.png")}
+          source={require("../assets/images/favorited.png")}
           style={styles.favorite}
         />
         <Text style={styles.recipeTitle}>{title}</Text>
         <TouchableOpacity onPress={toggleVisibility} style={styles.toggle}>
-          <Image source={require("../assets/images/toggledown.png")} />
+          <Image source={isVisible?require("../assets/images/toggleup.png"):require("../assets/images/toggledown.png")}/>
         </TouchableOpacity>
       </View>
       {isVisible && <Text style={styles.recipeDescription}>{description}</Text>}
