@@ -27,7 +27,9 @@ export default function ProfilePage() {
 
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Friends</Text>
-        <Image source={require('../assets/images/addfriend.png')}/>
+        <TouchableOpacity>
+         <Image source={require('../assets/images/addfriend.png')}/>
+        </TouchableOpacity>
       </View>
       <View style={styles.friendsContainer}>
         {savedFriends.map((friend) => (
