@@ -1,4 +1,4 @@
-package com.stickersmash
+package com.jasoninthebox.StickerSmash
 
 import android.app.Application
 import android.content.res.Configuration

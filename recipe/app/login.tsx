@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import * as Google from "expo-auth-session/providers/google";
-import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import { makeRedirectUri } from "expo-auth-session";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export type User = {
   token?: string;
@@ -13,38 +16,54 @@ interface LoginProps {
 }
 
 export default function Login({ setUser }: LoginProps) {
-  const redirectUri = 'http://localhost:8000';
+  const {
+    iosClientId,
+    androidClientId,
+    webClientId,
+  } = {
+    iosClientId:
+      "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com",
+    androidClientId:
+      "1075996537970-fs8hdir9k2bgitt2vkt1am13hfflajvc.apps.googleusercontent.com",
+    webClientId:
+      "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com",
+  };
+
+  const redirectUri = makeRedirectUri({
+    useProxy: true,
+  } as any);
+  console.log("Redirect URI:", redirectUri);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com",
+    iosClientId,
+    androidClientId,
+    webClientId,
+    scopes: ["profile", "email"],
     redirectUri,
+    extraParams:{
+      prompt: "select_account",
+    }
   });
 
   useEffect(() => {
-    if (response?.type === "success" && response.authentication) {
+    if (response?.type === "success") {
       const { authentication } = response;
-      handleGoogleLogin(authentication.accessToken);
+      fetchUserInfo(authentication.accessToken);
+    } else if (response?.type === "error") {
+      console.error("Authentication error", response.error);
     }
   }, [response]);
 
-  const handleGoogleLogin = async (accessToken: string) => {
+  const fetchUserInfo = async (token: string) => {
     try {
-      const response = await fetch("http://localhost:5000/google-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken }),
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        await SecureStore.setItemAsync("token", data.token);
-        setUser({ token: data.token });
-        Alert.alert("Success", "Login successful!");
-      } else {
-        Alert.alert("Error", data.error || "Google login failed");
-      }
-    } catch (err) {
-      Alert.alert("Error", "Something went wrong with Google login");
+      const res = await fetch(
+        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`
+      );
+      const user = await res.json();
+      console.log("User info:", user);
+      setUser({ token });
+    } catch (error) {
+      console.error("Failed to fetch user info", error);
     }
   };
 
@@ -54,21 +73,30 @@ export default function Login({ setUser }: LoginProps) {
 
   return (
     <View style={styles.container}>
-      <Image source={require("./../assets/images/icon.png")} style={styles.logo} />
+      <Image
+        source={require("./../assets/images/icon.png")}
+        style={styles.logo}
+      />
       <Text style={styles.title}>Recipe Generator</Text>
       <Text style={styles.subtitle}>Your personal recipe assistant</Text>
-  
 
       <TouchableOpacity
         style={[styles.button, styles.googleButton]}
-        onPress={() => promptAsync()}
-        disabled={!request}
+        onPress={() => {
+          promptAsync({ useProxy: true });
+        }}
       >
-        <Image source={require("./../assets/images/google-icon.png")} style={styles.buttonIcon} />
+        <Image
+          source={require("./../assets/images/google-icon.png")}
+          style={styles.buttonIcon}
+        />
         <Text style={styles.buttonText}>Login with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.button, styles.guestButton]} onPress={handleGuestLogin}>
+      <TouchableOpacity
+        style={[styles.button, styles.guestButton]}
+        onPress={handleGuestLogin}
+      >
         <Text style={styles.buttonText}>Continue as Guest</Text>
       </TouchableOpacity>
     </View>

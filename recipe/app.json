@@ -1,31 +1,51 @@
 {
   "expo": {
     "name": "StickerSmash",
-    "slug": "StickerSmash",
+    "slug": "stickersmash",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/app_icon/icon.png",
-    "scheme": "https://auth.expo.io/@expoid/StickerSmash",
+    "icon": "./assets/icon.png",
+    "scheme": "stickersmash",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
     "ios": {
-      "supportsTablet": true,
-      "icon": "./assets/app_icon/ios/icon.png"
+      "icon": "./assets/icon.png",
+      "bundleIdentifier": "com.jasoninthebox.StickerSmash",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "stickersmash"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app_icon/android/foreground.png",
+        "foregroundImage": "./assets/app_icon/android/res/mipmap-mdpi/ic_launcher_foreground.png",
         "backgroundColor": "#ffffff"
       },
-      "icon": "./assets/app_icon/android/icon.png"
+      "package": "com.jasoninthebox.StickerSmash",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "stickersmash"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/app_icon/web/favicon.png",
+      "favicon": "./assets/app_icon/web/favicon.ico",
       "manifest": {
-        "short_name": "RecipeGenerator",
-        "name": "Recipe Generator",
+        "short_name": "StickerSmash",
+        "name": "StickerSmash",
         "start_url": ".",
         "display": "standalone",
         "background_color": "#ffffff",
@@ -45,25 +65,11 @@
       }
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/app_icon/splash.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ],
-      "expo-secure-store"
+
     ],
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
-      "google": {
-        "iosClientId": "http://localhost:8000",
-        "androidClientId": "http://localhost:8000"
+      "eas": {
+        "projectId": "8048451a-a19d-48b2-9192-c2402ac2b276"
       }
     }
   }
