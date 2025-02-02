@@ -8,7 +8,7 @@ import RecipePage from "./recipe";
 import ProfilePage from "./profile";
 import SettingsPage from "./settings";
 
-import Login, { User } from "./login";
+import Login from "./login";
 
 const Tab = createBottomTabNavigator();
 
@@ -20,6 +20,7 @@ export default function RootLayout() {
   }
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
