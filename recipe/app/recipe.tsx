@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   Image,
   View,
@@ -7,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 
 function Recipe({ title, description }) {
@@ -24,7 +25,13 @@ function Recipe({ title, description }) {
         />
         <Text style={styles.recipeTitle}>{title}</Text>
         <TouchableOpacity onPress={toggleVisibility} style={styles.toggle}>
-          <Image source={isVisible?require("../assets/images/toggleup.png"):require("../assets/images/toggledown.png")}/>
+          <Image
+            source={
+              isVisible
+                ? require("../assets/images/toggleup.png")
+                : require("../assets/images/toggledown.png")
+            }
+          />
         </TouchableOpacity>
       </View>
       {isVisible && <Text style={styles.recipeDescription}>{description}</Text>}
@@ -33,26 +40,53 @@ function Recipe({ title, description }) {
 }
 
 export default function RecipePage() {
-  const generateRecipes = () => {
-    alert("Function not yet implemented");
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const generateRecipes = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/generate_recipes", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.recipes) {
+        const recipeList = data.recipes.split("\n\n").map((recipe) => {
+          const [title, description] = recipe.split(": ");
+          return { title: title.replace(/\d+\)\s*/, ""), description };
+        });
+        setRecipes(recipeList);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to generate recipes. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Saved Recipes</Text>
 
-      {/* Scrollable recipe container */}
       <ScrollView
         style={styles.recipesContainer}
         contentContainerStyle={styles.recipesContentContainer}
       >
-        <Recipe
-          title="Omlette"
-          description="This is where the recipe description and ingredients will appear."
-        />
-        <Recipe
-          title="Fried Rice with Spam"
-          description="This is where the recipe description and ingredients will appear."
-        />
+        {recipes.length > 0 ? (
+          recipes.map((recipe, index) => (
+            <Recipe key={index} title={recipe.title} description={recipe.description} />
+          ))
+        ) : (
+          <Text style={styles.noRecipes}>No recipes available. Generate some!</Text>
+        )}
       </ScrollView>
 
       <View style={styles.buttonContainer}>
@@ -60,20 +94,23 @@ export default function RecipePage() {
           style={styles.button}
           onPress={generateRecipes}
           activeOpacity={0.8}
+          disabled={loading}
         >
-          <Text style={styles.buttonText}>Generate Recipes</Text>
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Generate Recipes</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-/* styles */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    color: "#F6FFF7", 
-    // this color isnt showing up idk why
+    backgroundColor: "#F6FFF7",
   },
   title: {
     fontSize: 32,
@@ -118,6 +155,12 @@ const styles = StyleSheet.create({
     color: "#666",
     lineHeight: 22,
   },
+  noRecipes: {
+    fontSize: 18,
+    color: "#888",
+    textAlign: "center",
+    marginTop: 20,
+  },
   buttonContainer: {
     padding: 20,
     backgroundColor: "#F6FFF7",
@@ -138,6 +181,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    alignItems: "center",
   },
   buttonText: {
     color: "white",
