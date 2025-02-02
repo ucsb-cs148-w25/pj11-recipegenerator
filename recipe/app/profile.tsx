@@ -1,7 +1,7 @@
 import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 
 export default function ProfilePage() {
-  const savedRecipes = [
+  const savedFriends = [
     { 
       id: '1', 
       name: 'Chappell Roan',
@@ -18,7 +18,7 @@ export default function ProfilePage() {
 
   return (
     <ScrollView style={styles.container}>
-      <Image source={require('./../assets/images/defaultprofilepic.png')} style={styles.image} />
+      <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.iconpic} />
       <View style={styles.profileCard}>
         <Text style={styles.name}>Taylor Swift</Text>
         <Text style={styles.username}>@taylorswift</Text>
@@ -27,11 +27,12 @@ export default function ProfilePage() {
 
       <Text style={styles.sectionTitle}>Friends</Text>
       <View style={styles.friendsContainer}>
-        {savedRecipes.map((recipe) => (
-          <View key={recipe.id} style={styles.friendsCard}>
-            <Text style={styles.recipeName}>{recipe.name}</Text>
-            <TouchableOpacity style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>Remove Friend</Text>
+        {savedFriends.map((friend) => (
+          <View key={friend.id} style={styles.friendsCard}>
+            <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon}/>
+            <Text style={styles.friendName}>{friend.name}</Text>
+            <TouchableOpacity style={styles.removeButton}>
+              <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
           </View>
         ))}
@@ -51,7 +52,7 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: '#E0FFFF',
+    backgroundColor: '#F6FFF7',
   },
   profileCard: {
     padding: 10,
@@ -59,7 +60,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '600',
     color: '#088F8F',
     marginBottom: 15,
@@ -82,11 +83,12 @@ const styles = StyleSheet.create({
   friendsCard: {
     display: 'flex',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
     borderRadius: 15,
     padding: 15,
     marginBottom: 10,
+    backgroundColor: '#F7CE45',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -96,36 +98,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  recipeName: {
+  friendName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#088F8F',
+    color: '#1A535C',
     marginBottom: 8,
   },
-  recipeDetails: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 10,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  viewButton: {
-    backgroundColor: '#088F8F',
+  removeButton: {
+    backgroundColor: '#1A535C',
     padding: 8,
     borderRadius: 20,
-    alignItems: 'center',
-  },
-  viewButtonText: {
+    alignSelf: 'center',
+    justifyContent: "center"
+    },
+  removeButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
   },
   signOutButton: {
-    backgroundColor: '#088F8F',
+    backgroundColor: '#FF6B6B',
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
@@ -145,7 +137,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
   },
-  image: {
+  iconpic: {
     width: 100,
     height: 100,
     borderRadius: 50,
@@ -153,7 +145,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   name: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 5,
     fontFamily: "MoulRegular",
@@ -169,5 +161,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A535C',
     marginBottom: 10,
+  },
+  friendIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
   },
 });
