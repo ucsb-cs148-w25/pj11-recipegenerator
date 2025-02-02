@@ -3,71 +3,81 @@ import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, S
 
 export default function FridgePage() {
   const [inventories, setInventories] = useState({
-    vegetables: { Carrots: 1, Broccoli: 2 },
-    dairy: { Milk: 1, Eggs: 12, Butter: 1 },
-    frozen: { "Ice Cream": 1, "Frozen Peas": 1 },
+    "Ice Cream": 1,
+    "Frozen Peas": 1,
   });
   const [newIngredient, setNewIngredient] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<"vegetables" | "dairy" | "frozen">("vegetables");
 
-  const addIngredient = () => {
-    if (newIngredient.trim()) {
-      setInventories({
-        ...inventories,
-        [selectedCategory]: {
-          ...inventories[selectedCategory],
-          [newIngredient.trim()]: 1,
-        },
+  const addIngredient = async () => {
+    if (!newIngredient.trim()) return; // Prevent empty submissions
+  
+    const newItem = { name: newIngredient.trim(), quantity: 1 };
+  
+    try {
+      const response = await fetch("https://127.0.0.1:8000/fridge/add", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newItem),
       });
-      setNewIngredient("");
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+  
+      const data = await response.json(); // Parse JSON response
+  
+      setInventories((prevInventories) => [...prevInventories, data]); // Safe state update
+      setNewIngredient(""); // Clear input field
+  
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("Error adding item:", error.message);
+      } else {
+        console.error("Error adding item:", error);
+      }
     }
+
+  };
+  
+  const removeIngredient = (item: string) => {
+    const updatedInventories = { ...inventories };
+    delete updatedInventories[item];
+    setInventories(updatedInventories);
   };
 
-  const removeIngredient = (item: string, category: keyof typeof inventories) => {
-    const updatedCategory = { ...inventories[category] };
-    delete updatedCategory[item];
+  const updateQuantity = (item: string, value: number) => {
     setInventories({
       ...inventories,
-      [category]: updatedCategory,
+      [item]: isNaN(value) ? 0 : value,
     });
   };
 
-  const updateQuantity = (item: string, category: keyof typeof inventories, value: number) => {
-    setInventories({
-      ...inventories,
-      [category]: {
-        ...inventories[category],
-        [item]: isNaN(value) ? 0 : value,
-      },
-    });
-  };
-
-  const renderCategory = (title: string, category: keyof typeof inventories) => (
-    <View style={styles.categoryContainer}>
-      <Text style={styles.categoryTitle}>{title}</Text>
+  return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Fridge Inventory</Text>
       <FlatList
-        data={Object.keys(inventories[category])}
+        data={Object.keys(inventories)}
         keyExtractor={(item) => item}
         renderItem={({ item }) => (
           <View style={styles.ingredientItem}>
-            <TouchableOpacity onPress={() => removeIngredient(item, category)}>
+            <TouchableOpacity onPress={() => removeIngredient(item)}>
               <Text style={styles.removeButton}>×</Text>
             </TouchableOpacity>
             <Text style={styles.ingredientText}>{item}</Text>
             <View style={styles.quantityContainer}>
-              <TouchableOpacity onPress={() => updateQuantity(item, category, inventories[category][item] - 1)}>
+              <TouchableOpacity onPress={() => updateQuantity(item, inventories[item] - 1)}>
                 <Text style={styles.button}>-</Text>
               </TouchableOpacity>
               <TextInput
                 style={styles.quantityInput}
                 keyboardType="numeric"
-                value={inventories[category][item] === 0 ? "" : String(inventories[category][item])}
+                value={inventories[item] === 0 ? "" : String(inventories[item])}
                 onChangeText={(text) => {
                   const num = text === "" ? 0 : parseInt(text) || 0;
-                  updateQuantity(item, category, num);
+                  updateQuantity(item, num);
                 }}
               />
-              <TouchableOpacity onPress={() => updateQuantity(item, category, inventories[category][item] + 1)}>
+              <TouchableOpacity onPress={() => updateQuantity(item, inventories[item] + 1)}>
                 <Text style={styles.button}>+</Text>
               </TouchableOpacity>
             </View>
@@ -76,28 +86,15 @@ export default function FridgePage() {
       />
       <View style={styles.addSection}>
         <TextInput
-          style={[styles.input, selectedCategory === category && styles.selectedInput]}
-          placeholder={`Add ${title}`}
-          value={selectedCategory === category ? newIngredient : ""}
+          style={styles.input}
+          placeholder="Add Ingredient"
+          value={newIngredient}
           onChangeText={setNewIngredient}
-          onFocus={() => setSelectedCategory(category)}
         />
-        <TouchableOpacity 
-          style={[styles.addButton, { opacity: selectedCategory === category ? 1 : 0.5 }]}
-          onPress={selectedCategory === category ? addIngredient : undefined}
-        >
+        <TouchableOpacity style={styles.addButton} onPress={addIngredient}>
           <Image source={require("./../assets/images/add3.png")} />
         </TouchableOpacity>
       </View>
-    </View>
-  );
-
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Fridge Inventory</Text>
-      {renderCategory("Vegetables", "vegetables")}
-      {renderCategory("Dairy", "dairy")}
-      {renderCategory("Frozen", "frozen")}
     </ScrollView>
   );
 }
