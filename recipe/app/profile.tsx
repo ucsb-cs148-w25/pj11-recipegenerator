@@ -4,15 +4,15 @@ export default function ProfilePage() {
   const savedRecipes = [
     { 
       id: '1', 
-      name: 'Beef Stir Fry',
-      savedDate: '2024-03-20',
-      difficulty: 'Medium'
+      name: 'Chappell Roan',
     },
     { 
       id: '2', 
-      name: 'Classic Pancakes',
-      savedDate: '2024-03-19',
-      difficulty: 'Easy'
+      name: 'Ziad Matni',
+    },
+    { 
+      id: '3', 
+      name: 'Tobias Hollerer',
     }
   ];
 
@@ -23,24 +23,15 @@ export default function ProfilePage() {
         <Text style={styles.name}>Taylor Swift</Text>
         <Text style={styles.username}>@taylorswift</Text>
         <Text style={styles.bio}>I love fries and burgers</Text>
-
-        {/* <View style={styles.statsContainer}>
-          <Text style={styles.statText}>Saved: {savedRecipes.length}</Text>
-        </View> */}
-        {/* personally not sure if I like this feature bc its kinda clutter, but if we wanna add it back ill design a more intuitive way to display recipe count - Christy */}
       </View>
 
-      <Text style={styles.sectionTitle}>Saved Recipes</Text>
-      <View style={styles.recipesContainer}>
+      <Text style={styles.sectionTitle}>Friends</Text>
+      <View style={styles.friendsContainer}>
         {savedRecipes.map((recipe) => (
-          <View key={recipe.id} style={styles.recipeCard}>
+          <View key={recipe.id} style={styles.friendsCard}>
             <Text style={styles.recipeName}>{recipe.name}</Text>
-            <View style={styles.recipeDetails}>
-              <Text style={styles.detailText}>Saved: {recipe.savedDate}</Text>
-              <Text style={styles.detailText}>Difficulty: {recipe.difficulty}</Text>
-            </View>
             <TouchableOpacity style={styles.viewButton}>
-              <Text style={styles.viewButtonText}>View Recipe</Text>
+              <Text style={styles.viewButtonText}>Remove Friend</Text>
             </TouchableOpacity>
           </View>
         ))}
@@ -84,10 +75,14 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
   },
-  recipesContainer: {
+  friendsContainer: {
     marginBottom: 20,
+    display: 'flex',
   },
-  recipeCard: {
+  friendsCard: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 15,
