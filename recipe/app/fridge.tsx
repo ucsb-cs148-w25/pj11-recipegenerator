@@ -1,86 +1,160 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
 
 export default function FridgePage() {
-  const [inventories, setInventories] = useState({
-    "Ice Cream": 1,
-    "Frozen Peas": 1,
-  });
-  const [newIngredient, setNewIngredient] = useState("");
+  const [items, setItems] = useState([]);
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [editingQuantity, setEditingQuantity] = useState({});
 
-  const addIngredient = async () => {
-    if (!newIngredient.trim()) return; // Prevent empty submissions
-  
-    const newItem = { name: newIngredient.trim(), quantity: 1 };
-  
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+  const fetchItems = async () => {
     try {
-      const response = await fetch("https://127.0.0.1:8000/fridge/add", { 
+      const response = await fetch("http://127.0.0.1:8000/fridge/get");
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setItems(data);
+      } else {
+        console.error("Unexpected data format:", data);
+        setItems([]);
+      }
+    } catch (error) {
+      console.error("Error fetching items:", error);
+    }
+  };
+
+  const addItem = async () => {
+    if (!name || !quantity) return;
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newItem),
+        body: JSON.stringify({ name, quantity: parseInt(quantity) }),
+      });
+      const data = await response.json();
+      setItems(data.all_items);
+      setName("");
+      setQuantity("");
+      fetchItems();
+    } catch (error) {
+      console.error("Error adding item:", error);
+    }
+  };
+
+  const updateQuantity = async (itemName) => {
+    if (!(itemName in editingQuantity)) return;
+    const newQuantity = editingQuantity[itemName];
+    if (newQuantity === "") return;
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: itemName, quantity: parseInt(newQuantity) || 0 }),
+      });
+      const data = await response.json();
+      setItems(data.all_items);
+      fetchItems();
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    }
+  };
+
+  const removeItemCompletely = async (itemName) => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: itemName, quantity: 1000000000 }), // Remove completely
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+      fetchItems(); // 🔹 Refresh the item list to prevent clearing all items
+    } catch (error) {
+      console.error("Error removing item completely:", error);
+    }
+  };
+
+  const decrementQuantity = async (itemName, currentQuantity) => {
+    try {
+      if (currentQuantity > 1) {
+        const response = await fetch("http://127.0.0.1:8000/fridge/remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: itemName, quantity: 1 }), // Decrement by 1
+        });
+  
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+  
+        fetchItems(); // 🔹 Ensure we fetch the updated list
+      } else {
+        removeItemCompletely(itemName); // If last item, remove it entirely
+      }
+    } catch (error) {
+      console.error("Error decrementing item:", error);
+    }
+  };
+
+  
+  const incrementQuantity = async (itemName, currentQuantity) => {
+    try {
+      const newQuantity = currentQuantity + 1; // Increment quantity by 1
+  
+      const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: itemName, quantity: newQuantity }),
       });
   
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
       }
   
-      const data = await response.json(); // Parse JSON response
+      setEditingQuantity((prev) => ({
+        ...prev,
+        [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+      }));
   
-      setInventories((prevInventories) => [...prevInventories, data]); // Safe state update
-      setNewIngredient(""); // Clear input field
-  
+      fetchItems(); // Refresh the item list after update
     } catch (error) {
-      if (error instanceof Error) {
-        console.error("Error adding item:", error.message);
-      } else {
-        console.error("Error adding item:", error);
-      }
+      console.error("Error incrementing quantity:", error);
     }
-
   };
   
-  const removeIngredient = (item: string) => {
-    const updatedInventories = { ...inventories };
-    delete updatedInventories[item];
-    setInventories(updatedInventories);
-  };
-
-  const updateQuantity = (item: string, value: number) => {
-    setInventories({
-      ...inventories,
-      [item]: isNaN(value) ? 0 : value,
-    });
-  };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
       <FlatList
-        data={Object.keys(inventories)}
-        keyExtractor={(item) => item}
+        data={items}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.ingredientItem}>
-            <TouchableOpacity onPress={() => removeIngredient(item)}>
-              <Text style={styles.removeButton}>×</Text>
+            <TouchableOpacity onPress={() => removeItemCompletely(item.name)}>
+              <Text style={styles.removeButton}>🗑</Text>
             </TouchableOpacity>
-            <Text style={styles.ingredientText}>{item}</Text>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity onPress={() => updateQuantity(item, inventories[item] - 1)}>
-                <Text style={styles.button}>-</Text>
-              </TouchableOpacity>
-              <TextInput
-                style={styles.quantityInput}
-                keyboardType="numeric"
-                value={inventories[item] === 0 ? "" : String(inventories[item])}
-                onChangeText={(text) => {
-                  const num = text === "" ? 0 : parseInt(text) || 0;
-                  updateQuantity(item, num);
-                }}
-              />
-              <TouchableOpacity onPress={() => updateQuantity(item, inventories[item] + 1)}>
-                <Text style={styles.button}>+</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.ingredientText}>{item.name}</Text>
+            <TouchableOpacity onPress={() => decrementQuantity(item.name, item.quantity)}>
+              <Text style={styles.quantityButton}>-</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="numeric"
+              value={editingQuantity[item.name] !== undefined ? editingQuantity[item.name] : String(item.quantity)}
+              onChangeText={(text) => setEditingQuantity({ ...editingQuantity, [item.name]: text })}
+              onSubmitEditing={() => updateQuantity(item.name)}
+            />
+            <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
+              <Text style={styles.quantityButton}>+</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -88,10 +162,17 @@ export default function FridgePage() {
         <TextInput
           style={styles.input}
           placeholder="Add Ingredient"
-          value={newIngredient}
-          onChangeText={setNewIngredient}
+          value={name}
+          onChangeText={setName}
         />
-        <TouchableOpacity style={styles.addButton} onPress={addIngredient}>
+        <TextInput
+          style={styles.input}
+          placeholder="Quantity"
+          value={quantity}
+          onChangeText={setQuantity}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity style={styles.addButton} onPress={addItem}>
           <Image source={require("./../assets/images/add3.png")} />
         </TouchableOpacity>
       </View>
@@ -112,17 +193,8 @@ const styles = StyleSheet.create({
     color: "#088F8F",
     letterSpacing: 0.5,
   },
-  input: { 
-    borderWidth: 1,
-    borderColor: "#088F8F",
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 5,
-    backgroundColor: "white",
-  },
   ingredientItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -138,18 +210,10 @@ const styles = StyleSheet.create({
   ingredientText: {
     fontSize: 16,
     color: "#088F8F",
-  },
-  quantityContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  button: {
-    fontSize: 20,
-    color: "#088F8F",
-    paddingHorizontal: 10,
+    flex: 1,
   },
   quantityInput: {
-    width: 40,
+    width: 50,
     height: 30,
     borderWidth: 1,
     borderColor: "#088F8F",
@@ -157,6 +221,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 5,
     backgroundColor: "white",
+  },
+  removeButton: {
+    fontSize: 20,
+    color: "#dc3545",
+    paddingHorizontal: 10,
   },
   addButton: {
     padding: 15,
@@ -169,30 +238,17 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  categoryContainer: {
-    marginBottom: 20,
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  categoryTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "#088F8F",
-    marginBottom: 10,
-  },
   addSection: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  selectedInput: {
+  input: { 
+    borderWidth: 1,
     borderColor: "#088F8F",
-    borderWidth: 2,
+    padding: 10,
+    marginVertical: 10,
+    borderRadius: 5,
+    backgroundColor: "white",
   },
 });
