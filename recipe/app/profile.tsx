@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: '#E0FFFF',
+    backgroundColor: '#F6FFF7',
   },
   profileCard: {
     padding: 10,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '600',
     color: '#088F8F',
     marginBottom: 15,
@@ -85,10 +85,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
     borderRadius: 15,
     padding: 15,
     marginBottom: 10,
+    backgroundColor: '#F7CE45',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -101,11 +101,11 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#088F8F',
+    color: '#1A535C',
     marginBottom: 8,
   },
   removeButton: {
-    backgroundColor: '#088F8F',
+    backgroundColor: '#1A535C',
     padding: 8,
     borderRadius: 20,
     alignSelf: 'center',
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   signOutButton: {
-    backgroundColor: '#088F8F',
+    backgroundColor: '#FF6B6B',
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   name: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 5,
     fontFamily: "MoulRegular",
