@@ -25,7 +25,10 @@ export default function ProfilePage() {
         <Text style={styles.bio}>I love fries and burgers</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Friends</Text>
+      <View style={styles.header}>
+        <Text style={styles.sectionTitle}>Friends</Text>
+        <Image source={require('../assets/images/addfriend.png')}/>
+      </View>
       <View style={styles.friendsContainer}>
         {savedFriends.map((friend) => (
           <View key={friend.id} style={styles.friendsCard}>
@@ -168,4 +171,9 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 10,
   },
+  header:{
+    flexDirection: 'row',
+    marginBottom: 10,
+    gap: 10,
+  }
 });
