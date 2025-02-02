@@ -7,7 +7,7 @@ export default function SettingsPage() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
-      <View>
+      <View style={styles.settingscard}>
         <Text style={styles.sectionTitle}>Notifications</Text>
         <View style={styles.settingscategory}>
           <Text>Enable Notifications</Text>
@@ -17,7 +17,7 @@ export default function SettingsPage() {
           />
         </View>
       </View>
-      <View>
+      <View style={styles.settingscard}>
         <Text style={styles.sectionTitle}>Friends & Privacy</Text>
         <View style={styles.settingscategory}>
           <Text>Enable Friends Suggestion</Text>
@@ -62,4 +62,16 @@ const styles = StyleSheet.create({
     fontSize: 25,
     color: "#088F8F",
   },
+  settingscard:{
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+  }
 });
