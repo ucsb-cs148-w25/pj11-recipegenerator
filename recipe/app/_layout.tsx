@@ -43,7 +43,10 @@ export default function RootLayout() {
       <Tab.Screen name="Home" component={Homepage} />
       <Tab.Screen name="Fridge" component={FridgePage} />
       <Tab.Screen name="Recipes" component={RecipePage} />
-      <Tab.Screen name="Profile" component={ProfilePage} />
+      <Tab.Screen
+        name="Profile"
+        children={() => <ProfilePage setUser={setUser} />}
+      />
       <Tab.Screen name="Settings" component={SettingsPage} />
     </Tab.Navigator>
   );

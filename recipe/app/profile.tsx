@@ -1,20 +1,31 @@
 import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { router } from 'expo-router';
+import { User } from './login';
 
-export default function ProfilePage() {
+interface ProfilePageProps {
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+}
+
+export default function ProfilePage({ setUser }: ProfilePageProps) {
   const savedFriends = [
-    { 
-      id: '1', 
+    {
+      id: '1',
       name: 'Chappell Roan',
     },
-    { 
-      id: '2', 
+    {
+      id: '2',
       name: 'Ziad Matni',
     },
-    { 
-      id: '3', 
+    {
+      id: '3',
       name: 'Tobias Hollerer',
     }
   ];
+
+  const handleSignOut = () => {
+    // Set user to null to trigger login page render
+    setUser(null);
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -28,13 +39,13 @@ export default function ProfilePage() {
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Friends</Text>
         <TouchableOpacity>
-         <Image source={require('../assets/images/addfriend.png')}/>
+          <Image source={require('../assets/images/addfriend.png')} />
         </TouchableOpacity>
       </View>
       <View style={styles.friendsContainer}>
         {savedFriends.map((friend) => (
           <View key={friend.id} style={styles.friendsCard}>
-            <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon}/>
+            <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
             <Text style={styles.friendName}>{friend.name}</Text>
             <TouchableOpacity style={styles.removeButton}>
               <Text style={styles.removeButtonText}>Remove</Text>
@@ -43,9 +54,9 @@ export default function ProfilePage() {
         ))}
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.signOutButton}
-        onPress={() => alert("feature not implemented yet")}
+        onPress={handleSignOut}
       >
         <Text style={styles.buttonText}>Sign Out</Text>
       </TouchableOpacity>
@@ -54,8 +65,8 @@ export default function ProfilePage() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     padding: 20,
     backgroundColor: '#F6FFF7',
   },
@@ -115,7 +126,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignSelf: 'center',
     justifyContent: "center"
-    },
+  },
   removeButtonText: {
     color: 'white',
     fontSize: 14,
@@ -173,7 +184,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 10,
   },
-  header:{
+  header: {
     flexDirection: 'row',
     marginBottom: 10,
     gap: 10,
