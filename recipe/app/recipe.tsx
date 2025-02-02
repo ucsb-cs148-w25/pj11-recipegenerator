@@ -72,7 +72,8 @@ export default function RecipePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    color: "#1A535C",
+    color: "#F6FFF7", 
+    // this color isnt showing up idk why
   },
   title: {
     fontSize: 32,
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     padding: 20,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F6FFF7",
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
   },
