@@ -8,7 +8,7 @@ import RecipePage from "./recipe";
 import ProfilePage from "./profile";
 import SettingsPage from "./settings";
 
-import Login from "./login";
+import Login, {User} from "./login";
 
 const Tab = createBottomTabNavigator();
 
@@ -44,10 +44,9 @@ export default function RootLayout() {
       <Tab.Screen name="Home" component={Homepage} />
       <Tab.Screen name="Fridge" component={FridgePage} />
       <Tab.Screen name="Recipes" component={RecipePage} />
-      <Tab.Screen
-        name="Profile"
-        children={() => <ProfilePage setUser={setUser} />}
-      />
+      <Tab.Screen name="Profile">
+        {() => <ProfilePage setUser={setUser} user={user} />}
+      </Tab.Screen>
       <Tab.Screen name="Settings" component={SettingsPage} />
     </Tab.Navigator>
   );
