@@ -1,6 +1,7 @@
-import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert} from "react-native";
 import { router } from 'expo-router';
 import { User } from './login';
+import {GoogleSignin, statusCodes} from "@react-native-google-signin/google-signin";
 
 interface ProfilePageProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -23,9 +24,24 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   ];
 
-  const handleSignOut = () => {
-    // Set user to null to trigger login page render
-    setUser(null);
+  const handleSignOut = async () => {
+    try {
+      await GoogleSignin.revokeAccess();
+      await GoogleSignin.signOut();
+      console.log("User successfully signed out");
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_REQUIRED || 
+          (error.message && error.message.includes("sign_in_required"))) {
+        console.log("User not signed in, proceeding to clear state");
+      } else {
+        console.error("Error signing out:", error);
+        Alert.alert("Sign Out Error", error.message || JSON.stringify(error));
+        return;
+      }
+    } finally {
+      setUser(null);
+      router.replace("/login");
+    }
   };
 
   return (
