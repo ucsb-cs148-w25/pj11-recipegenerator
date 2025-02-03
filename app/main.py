@@ -16,7 +16,7 @@ from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 
 # Import the ML functions
-from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
+# from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
 
 # Import the Pydantic models from app/models.py 
 from app.models import (
@@ -58,6 +58,7 @@ def unpack_item(item: dict) -> FridgeItem:
     """
     # Construct a FridgeItem model from the MongoDB document
     return FridgeItem(
+        user_id=str(item.get("user_id", "unknown")),
         id=str(item["_id"]),
         name=item["name"],
         quantity=item["quantity"]
@@ -83,12 +84,13 @@ def opening_page():
     return OpeningPageResponse(Message="Welcome to the fridge app!")
 
 @app.get("/fridge/get", response_model=list[FridgeItem])
-def get_items():
+def get_items(user_id: str):
     """
     Retrieve all items in the fridge. Each item is represented 
     by the FridgeItem model.
     """
-    items_cursor = fridge_items.find()  # Query all items from the DB
+    # Query only the item correcponding to the user_id
+    items_cursor = fridge_items.find({"user_id": user_id}) 
     # Convert each MongoDB document into a FridgeItem using unpack_item
     return [unpack_item(item) for item in items_cursor]
 
@@ -105,12 +107,12 @@ def add_item(item: Item):
     """
     # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
     fridge_items.update_one(
-        {"name": item.name},
+        {"user_id": item.user_id, "name": item.name},
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
     # Get the updated list of items in the fridge
-    all_items_fridge = get_items()  # This will return a list[FridgeItem]
+    all_items_fridge = get_items(item.user_id)  # This will return a list[FridgeItem]
     
     # Return a response that includes a short message and the updated item list
     return AddItemResponse(
@@ -129,7 +131,7 @@ def remove_item(item: Item):
       2) Check that the fridge contains enough quantity.
       3) Subtract the item quantity or remove the document if it goes to zero.
     """
-    existing_item = fridge_items.find_one({"name": item.name})
+    existing_item = fridge_items.find_one({"user_id": item.user_id, "name": item.name})
 
     if not existing_item:
         # If the item doesn't exist, raise a 404 error
@@ -142,13 +144,15 @@ def remove_item(item: Item):
     # Decrease the quantity or delete the item
     new_quantity = existing_item["quantity"] - item.quantity
     if new_quantity > 0:
-        fridge_items.update_one({"name": item.name}, {"$set": {"quantity": new_quantity}})
+        fridge_items.update_one({"user_id": item.user_id, "name": item.name}, {"$set": {"quantity": new_quantity}})
     else:
-        fridge_items.delete_one({"name": item.name})
+        fridge_items.delete_one({"user_id": item.user_id, "name": item.name})
     
+    all_items_fridge = get_items(item.user_id)
     # Return a confirmation message
     return RemoveItemResponse(
-        message=f"{item.quantity} {item.name}(s) removed from the fridge."
+        message=f"{item.quantity} {item.name}(s) removed from the fridge.",
+        all_items=all_items_fridge
     )
 
 @app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
@@ -190,7 +194,8 @@ def generate_recipes():
             detail="The fridge is empty! Please add some ingredients first."
         )
     try:
-        recipe_text = generate_delicious_recipes(fridge_contents)
+        recipe_text = "recipe"
+        # recipe_text = generate_delicious_recipes(fridge_contents)
         return GenerateRecipesResponse(recipes=recipe_text)
     except Exception as e:
         raise HTTPException(
@@ -223,7 +228,8 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
 
     # --- Step 3: Call the ML function to extract recipe info --- #
     try:
-        recipes_from_image = extract_recipe_from_image(file_bytes)
+        # recipes_from_image = extract_recipe_from_image(file_bytes)
+        recipes_from_image = "r"
     except ValueError as e:
         # For known validation errors, raise a 400
         raise HTTPException(status_code=400, detail=str(e))

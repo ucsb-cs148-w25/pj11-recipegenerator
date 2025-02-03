@@ -22,6 +22,8 @@ class Item(BaseModel):
     Model for the request body used by the add_item and remove_item endpoints.
     This model validates that the user provides a string 'name' and an integer 'quantity'.
     """
+    # The user owning this item
+    user_id: str = Field(..., description = "user_id")
     # The name of the item to be added or removed
     name: str = Field(..., description="Name of the item.")
     # The quantity of the item to be added or removed
@@ -35,6 +37,8 @@ class FridgeItem(BaseModel):
     """
     # A string representing the unique identifier (ObjectId) of the item in the database
     id: str = Field(..., description="Unique identifier for this item.")
+    # Added: a string representing the unique identifier of the user using this database.
+    user_id: str = Field(..., description = "Unique identifier for user.")
     # The name of the item as stored in the fridge
     name: str = Field(..., description="Name of the item.")
     # The current quantity of the item
@@ -59,6 +63,8 @@ class RemoveItemResponse(BaseModel):
     """
     # A string containing a short message about the removed item
     message: str = Field(..., description="Confirmation message indicating successful item removal.")
+        # A list of all items currently in the fridge after the remove
+    all_items: List[FridgeItem] = Field(..., description="Complete list of items in the fridge.")
 
 
 class GenerateSuggestionsResponse(BaseModel):
