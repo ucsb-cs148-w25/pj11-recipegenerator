@@ -3,7 +3,9 @@ import { useState } from "react";
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-
+  const [friendsSuggestionEnabled, setFriendsSuggestionEnabled] =
+    useState(false);
+  const [friendsActivityEnabled, setFriendsActivityEnabled] = useState(false);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
@@ -22,15 +24,15 @@ export default function SettingsPage() {
         <View style={styles.settingscategory}>
           <Text>Enable Friends Suggestion</Text>
           <Switch
-            value={notificationsEnabled}
-            onValueChange={(value) => setNotificationsEnabled(value)}
+            value={friendsSuggestionEnabled}
+            onValueChange={(value) => setFriendsSuggestionEnabled(value)}
           />
         </View>
         <View style={styles.settingscategory}>
           <Text>Allow friends to see your activity</Text>
           <Switch
-            value={notificationsEnabled}
-            onValueChange={(value) => setNotificationsEnabled(value)}
+            value={friendsActivityEnabled}
+            onValueChange={(value) => setFriendsActivityEnabled(value)}
           />
         </View>
       </View>
@@ -39,15 +41,15 @@ export default function SettingsPage() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     padding: 20,
     backgroundColor: "#F6FFF7",
   },
-  title: { 
-    fontSize: 32, 
+  title: {
+    fontSize: 32,
     marginBottom: 15,
-    color: '#088F8F',
+    color: "#088F8F",
     fontWeight: "bold",
     letterSpacing: 0.5,
   },
@@ -62,16 +64,16 @@ const styles = StyleSheet.create({
     fontSize: 25,
     color: "#088F8F",
   },
-  settingscard:{
+  settingscard: {
     backgroundColor: "white",
     borderRadius: 15,
     padding: 20,
     marginBottom: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.1,
-  }
+  },
 });
