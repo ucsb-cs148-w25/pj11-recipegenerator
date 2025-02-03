@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert} from "react-native";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
@@ -9,6 +9,7 @@ WebBrowser.maybeCompleteAuthSession();
 export type User = {
   token?: string;
   guest?: boolean;
+  name?: string,
 };
 
 interface LoginProps {
@@ -48,9 +49,12 @@ export default function Login({ setUser }: LoginProps) {
   useEffect(() => {
     if (response?.type === "success") {
       const { authentication } = response;
-      fetchUserInfo(authentication.accessToken);
+      if(authentication && authentication.accessToken){
+        fetchUserInfo(authentication.accessToken);
+      }
     } else if (response?.type === "error") {
       console.error("Authentication error", response.error);
+      Alert.alert("Authentication error", response.error || "Unknown error");
     }
   }, [response]);
 
@@ -61,7 +65,7 @@ export default function Login({ setUser }: LoginProps) {
       );
       const user = await res.json();
       console.log("User info:", user);
-      setUser({ token });
+      setUser({ token, name: user.name });
     } catch (error) {
       console.error("Failed to fetch user info", error);
     }

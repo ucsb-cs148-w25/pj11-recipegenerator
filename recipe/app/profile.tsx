@@ -4,9 +4,10 @@ import { User } from './login';
 
 interface ProfilePageProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  user: User | null;
 }
 
-export default function ProfilePage({ setUser }: ProfilePageProps) {
+export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const savedFriends = [
     {
       id: '1',
@@ -31,8 +32,8 @@ export default function ProfilePage({ setUser }: ProfilePageProps) {
     <ScrollView style={styles.container}>
       <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.iconpic} />
       <View style={styles.profileCard}>
-        <Text style={styles.name}>Taylor Swift</Text>
-        <Text style={styles.username}>@taylorswift</Text>
+        <Text style={styles.name}>{user?.name ?? "Your Name"}</Text>
+        <Text style={styles.username}>@{user?.name ? user.name.replace(/\s+/g, '').toLowerCase() : "username"}</Text>
         <Text style={styles.bio}>I love fries and burgers</Text>
       </View>
 
