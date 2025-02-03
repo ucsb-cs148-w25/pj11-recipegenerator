@@ -82,10 +82,12 @@ export default function FridgePage() {
   const decrementQuantity = async (itemName, currentQuantity) => {
     try {
       if (currentQuantity > 1) {
-        const response = await fetch("http://127.0.0.1:8000/fridge/remove", {
+        const newQuantity = currentQuantity - 1; // Calculate new quantity
+  
+        const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: itemName, quantity: 1 }), // Decrement by 1
+          body: JSON.stringify({ name: itemName, quantity: newQuantity }),
         });
   
         if (!response.ok) {
@@ -93,7 +95,12 @@ export default function FridgePage() {
           throw new Error(`Error ${response.status}: ${errorText}`);
         }
   
-        fetchItems(); // 🔹 Ensure we fetch the updated list
+        setEditingQuantity((prev) => ({
+          ...prev,
+          [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+        }));
+  
+        fetchItems(); // Refresh the item list
       } else {
         removeItemCompletely(itemName); // If last item, remove it entirely
       }
@@ -101,6 +108,7 @@ export default function FridgePage() {
       console.error("Error decrementing item:", error);
     }
   };
+  
 
   
   const incrementQuantity = async (itemName, currentQuantity) => {

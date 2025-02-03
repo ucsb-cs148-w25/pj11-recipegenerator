@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, File, UploadFile
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import the ML functions
 from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
@@ -25,10 +26,14 @@ from app.models import (
     FridgeItem,
     AddItemResponse,
     RemoveItemResponse,
+    UpdateItemResponse,
     GenerateSuggestionsResponse,
     GenerateRecipesResponse,
     ImageRecipeResponse
 )
+
+
+
 
 # MongoDB URI
 # uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
@@ -47,6 +52,15 @@ app = FastAPI(
     docs_url="/",                 # Serve the Swagger docs at the root URL
     openapi_url="/openapi.json",  # Keep the OpenAPI specification accessible
     redoc_url="/redoc"            # Keep or remove ReDoc by setting it to None
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (change this later for security)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def unpack_item(item: dict) -> FridgeItem:
@@ -118,38 +132,57 @@ def add_item(item: Item):
         all_items=all_items_fridge
     )
 
+
 @app.post("/fridge/remove", response_model=RemoveItemResponse)
 def remove_item(item: Item):
     """
-    Remove an item from the fridge. The request body is validated by Item. 
-    Response is enforced by RemoveItemResponse.
-    
-    Steps:
-      1) Ensure the item exists in the fridge.
-      2) Check that the fridge contains enough quantity.
-      3) Subtract the item quantity or remove the document if it goes to zero.
+    Remove an item from the fridge.
+    """
+    existing_item = fridge_items.find_one({"name": item.name})
+    if not existing_item:
+        raise HTTPException(status_code=404, detail="Item not found in the fridge.")
+
+    if item.quantity == 1000000000:  # Remove entire item
+        fridge_items.delete_one({"name": item.name})
+        message = f"{item.name} completely removed."
+    else:
+        if existing_item["quantity"] < item.quantity:
+            raise HTTPException(status_code=400, detail="Not enough items in the fridge.")
+        new_quantity = existing_item["quantity"] - item.quantity
+        if new_quantity > 0:
+            fridge_items.update_one({"name": item.name}, {"$set": {"quantity": new_quantity}})
+            message = f"Decremented {item.name} by {item.quantity}."
+        else:
+            fridge_items.delete_one({"name": item.name})
+            message = f"{item.name} removed."
+
+    return RemoveItemResponse(
+        message=message,
+        all_items=get_items()
+    )
+
+@app.post("/fridge/update_quantity", response_model=UpdateItemResponse)
+def update_quantity(item: Item):
+    """
+    Update the quantity of an item in the fridge.
     """
     existing_item = fridge_items.find_one({"name": item.name})
 
     if not existing_item:
-        # If the item doesn't exist, raise a 404 error
         raise HTTPException(status_code=404, detail="Item not found in the fridge.")
 
-    # Validate that quantity is sufficient
-    if existing_item["quantity"] < item.quantity:
-        raise HTTPException(status_code=400, detail="Not enough items in the fridge.")
-    
-    # Decrease the quantity or delete the item
-    new_quantity = existing_item["quantity"] - item.quantity
-    if new_quantity > 0:
-        fridge_items.update_one({"name": item.name}, {"$set": {"quantity": new_quantity}})
-    else:
+    if item.quantity <= 0:
         fridge_items.delete_one({"name": item.name})
-    
-    # Return a confirmation message
-    return RemoveItemResponse(
-        message=f"{item.quantity} {item.name}(s) removed from the fridge."
+        message = f"{item.name} removed from the fridge."
+    else:
+        fridge_items.update_one({"name": item.name}, {"$set": {"quantity": item.quantity}})
+        message = f"{item.name} quantity updated to {item.quantity}."
+
+    return UpdateItemResponse(
+        message=message,
+        all_items=get_items()
     )
+
 
 @app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
 def generate_suggestions():
