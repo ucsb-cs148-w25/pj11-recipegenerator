@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from
 import * as GoogleAuthSession from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
-import { GoogleSignin, GoogleSigninButton, statusCodes, } from "@react-native-google-signin/google-signin";
+import {GoogleSignin, GoogleSigninButton } from "@react-native-google-signin/google-signin";
 import { useNavigation } from "@react-navigation/native";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -13,6 +13,7 @@ const webClientId =
 
 export type User = {
   token?: string;
+  serverAuthCode?: string;
   guest?: boolean;
   name?: string;
   email?: string;
@@ -22,30 +23,29 @@ interface LoginProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
-const sendUserDataToBackend = async (user: { token?: string; name?: string; email?: string }) => {
+const sendUserDataToBackend = async (user: { token?: string; serverAuthCode?: string; name?: string; email?: string }) => {
   console.log("Sending user data to backend:", user);
   console.log("User data payload (JSON):", JSON.stringify(user, null, 2));
   
-  // try {
-  //   const response = await fetch("https://your-backend.com/api/auth/login", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify(user),
-  //   });
-
-  //   if (!response.ok) {
-  //     throw new Error(`Backend returned status ${response.status}`);
-  //   }
-
-  //   const result = await response.json();
-  //   console.log("Backend response:", result);
-  //   return result;
-  // } catch (error) {
-  //   console.error("Error sending user data to backend:", error);
-  //   throw error;
-  // }
+  try {
+    const response = await fetch("http://localhost:8000/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Backend returned status ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log("Backend response:", result);
+    return result;
+  } catch (error) {
+    console.error("Error sending user data to backend:", error);
+    throw error;
+  }
 };
-
 
 export default function Login({ setUser }: LoginProps) {
   const navigation = useNavigation();
@@ -55,6 +55,7 @@ export default function Login({ setUser }: LoginProps) {
   const configureGoogleSignin = () => {
     GoogleSignin.configure({
       webClientId,
+      offlineAccess: true,
     });
   };
 
@@ -68,20 +69,22 @@ export default function Login({ setUser }: LoginProps) {
       console.log("Checking for Google Play Services...");
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       console.log("Google Play Services are available.");
-  
+
       console.log("Attempting native Google sign in...");
       const info = await GoogleSignin.signIn();
       console.log("Native sign in success:", info);
-  
+
       const result = info.data ? info.data : info;
       if (result && result.user) {
         const userData = {
           token: result.idToken,
+          serverAuthCode: result.serverAuthCode,
           name: result.user.name,
           email: result.user.email,
         };
         setUserInfo(info);
         setUser(userData);
+
         await sendUserDataToBackend(userData);
       } else {
         console.error("No user information returned. Full info:", info);
