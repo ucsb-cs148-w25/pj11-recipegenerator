@@ -19,7 +19,7 @@ from bson.objectid import ObjectId
 from app.routers.login import get_current_user
 
 # Import the ML functions
-# from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
+from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
 
 # Import the Pydantic models from app/models.py 
 from app.models import (
@@ -197,8 +197,7 @@ def generate_recipes(user_id: str = Depends(get_current_user)):
             detail="The fridge is empty! Please add some ingredients first."
         )
     try:
-        recipe_text = "recipe"
-        # recipe_text = generate_delicious_recipes(fridge_contents)
+        recipe_text = generate_delicious_recipes(fridge_contents)
         return GenerateRecipesResponse(recipes=recipe_text)
     except Exception as e:
         raise HTTPException(
@@ -231,8 +230,7 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
 
     # --- Step 3: Call the ML function to extract recipe info --- #
     try:
-        # recipes_from_image = extract_recipe_from_image(file_bytes)
-        recipes_from_image = "r"
+        recipes_from_image = extract_recipe_from_image(file_bytes)
     except ValueError as e:
         # For known validation errors, raise a 400
         raise HTTPException(status_code=400, detail=str(e))
