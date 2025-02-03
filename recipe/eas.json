@@ -10,12 +10,24 @@
       "ios":{
         "resourceClass": "m1-medium",
         "simulator": true
-      }
+      },
+     "android":{
+      "buildType": "apk"
+     }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios":{
+        "resourceClass": "m1-medium"
+      }
     },
     "production": {
+      "ios":{
+        "resourceClass": "m1-medium"
+      },
       "autoIncrement": true
     }
   },
