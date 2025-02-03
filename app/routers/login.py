@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Security, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 import httpx
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,9 @@ import jwt
 from datetime import datetime, timedelta
 
 app = FastAPI()
+
+# OAuth2 scheme (used in main.py)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Allow requests from anywhere (development convenience).
 # In production, configure this carefully or set a specific domain.
@@ -77,3 +81,15 @@ async def verify_google_access_token(access_token: str):
     if resp.status_code == 200:
         return resp.json()
     return None
+
+
+#
+def get_current_user(token: str = Security(oauth2_scheme)):
+    """
+    Extract the Google user ID (`sub`) from the JWT token.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]  # Return the Google user ID
+    except jwt.DecodeError:
+        raise HTTPException(status_code=401, detail="Invalid token")

@@ -10,10 +10,13 @@ We configure the docs to show at the root URL ("/") by setting docs_url="/".
 We also remove or repurpose the existing root endpoint to avoid conflicts.
 """
 
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
+
+# Import `get_current_user` from `login.py`
+from app.routers.login import get_current_user
 
 # Import the ML functions
 # from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
@@ -84,7 +87,7 @@ def opening_page():
     return OpeningPageResponse(Message="Welcome to the fridge app!")
 
 @app.get("/fridge/get", response_model=list[FridgeItem])
-def get_items(user_id: str):
+def get_items(user_id: str = Depends(get_current_user)):
     """
     Retrieve all items in the fridge. Each item is represented 
     by the FridgeItem model.
@@ -95,7 +98,7 @@ def get_items(user_id: str):
     return [unpack_item(item) for item in items_cursor]
 
 @app.post("/fridge/add", response_model=AddItemResponse)
-def add_item(item: Item):
+def add_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Add an item to the fridge. The request body is validated by Item. 
     Response is enforced by AddItemResponse.
@@ -107,7 +110,7 @@ def add_item(item: Item):
     """
     # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
     fridge_items.update_one(
-        {"user_id": item.user_id, "name": item.name},
+        {"user_id": user_id, "name": item.name},
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
@@ -121,7 +124,7 @@ def add_item(item: Item):
     )
 
 @app.post("/fridge/remove", response_model=RemoveItemResponse)
-def remove_item(item: Item):
+def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Remove an item from the fridge. The request body is validated by Item. 
     Response is enforced by RemoveItemResponse.
@@ -144,9 +147,9 @@ def remove_item(item: Item):
     # Decrease the quantity or delete the item
     new_quantity = existing_item["quantity"] - item.quantity
     if new_quantity > 0:
-        fridge_items.update_one({"user_id": item.user_id, "name": item.name}, {"$set": {"quantity": new_quantity}})
+        fridge_items.update_one({"user_id": user_id, "name": item.name}, {"$set": {"quantity": new_quantity}})
     else:
-        fridge_items.delete_one({"user_id": item.user_id, "name": item.name})
+        fridge_items.delete_one({"user_id": user_id, "name": item.name})
     
     all_items_fridge = get_items(item.user_id)
     # Return a confirmation message
@@ -156,14 +159,14 @@ def remove_item(item: Item):
     )
 
 @app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
-def generate_suggestions():
+def generate_suggestions(user_id: str = Depends(get_current_user)):
     """
     Generate item-based suggestions based on what is currently in the fridge. 
     Response is enforced by GenerateSuggestionsResponse.
     
     If the fridge is empty, raises a 400 error.
     """
-    items_cursor = fridge_items.find()
+    items_cursor = fridge_items.find({"user_id": user_id})
     item_names = [doc["name"] for doc in items_cursor]
 
     if not item_names:
@@ -177,7 +180,7 @@ def generate_suggestions():
     return GenerateSuggestionsResponse(suggestions=suggestions)
 
 @app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
-def generate_recipes():
+def generate_recipes(user_id: str = Depends(get_current_user)):
     """
     Generate three recipe suggestions based on current fridge contents using an ML function.
     Response is enforced by GenerateRecipesResponse.
@@ -185,7 +188,7 @@ def generate_recipes():
     Raises a 400 error if the fridge is empty, or a 500 error if recipe generation fails.
     """
     # Get all items from the fridge as (name, quantity) tuples
-    items_cursor = fridge_items.find()
+    items_cursor = fridge_items.find({"user_id": user_id})
     fridge_contents = [(doc["name"], doc["quantity"]) for doc in items_cursor]
 
     if not fridge_contents:
