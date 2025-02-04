@@ -29,7 +29,8 @@ from app.models import (
     UpdateItemResponse,
     GenerateSuggestionsResponse,
     GenerateRecipesResponse,
-    ImageRecipeResponse
+    ImageRecipeResponse,
+    FavoriteRecipe
 )
 
 
@@ -43,6 +44,9 @@ client = MongoClient(uri, server_api=ServerApi('1'))
 # Connect to the database and collection
 db = client["fridge"]
 fridge_items = db["fridge_items"]
+
+# Connect to MongoDB collections
+favorite_recipes = db["favorite_recipes"]
 
 # -----------------------------------------------------------------------------
 # 1) Configure the FastAPI instance so that docs_url="/" serves the Swagger UI.
@@ -267,3 +271,24 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     # --- Step 4: Return the result in the ImageRecipeResponse model --- #
     # We pass the extracted recipe info into the ImageRecipeResponse model
     return ImageRecipeResponse(recipes=recipes_from_image)
+
+@app.get("/fridge/get_favorite_recipes")
+def get_favorite_recipes():
+    """
+    Retrieve all saved (favorited) recipes.
+    """
+    favorite_recipes_cursor = db["favorite_recipes"].find()
+    favorite_recipes = [
+        {
+            "id": str(recipe["_id"]),
+            "title": recipe["title"],
+            "lastCooked": recipe.get("lastCooked", "N/A"),
+            "timesCooked": recipe.get("timesCooked", 1),
+            "rating": recipe.get("rating", None),
+            "notes": recipe.get("notes", ""),
+        }
+        for recipe in favorite_recipes_cursor
+    ]
+    
+    return favorite_recipes
+
