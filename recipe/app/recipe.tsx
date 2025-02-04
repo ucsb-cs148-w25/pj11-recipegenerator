@@ -11,17 +11,43 @@ import {
 
 function Recipe({ title, description }) {
   const [isVisible, setIsVisible] = useState(true);
+  const [isFavorited, setIsFavorited] = useState(false);
+
   const toggleVisibility = () => {
     setIsVisible(!isVisible);
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/recipes/favorite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description, isFavorited: !isFavorited }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update favorite status.");
+      }
+
+      setIsFavorited(!isFavorited);
+    } catch (error) {
+      console.error("Error updating favorite status:", error);
+    }
   };
 
   return (
     <View style={styles.recipeCard}>
       <View style={styles.header}>
-        <Image
-          source={require("../assets/images/favorited.png")}
-          style={styles.favorite}
-        />
+        <TouchableOpacity onPress={toggleFavorite}>
+          <Image
+            source={
+              isFavorited
+                ? require("../assets/images/favorited.png")
+                : require("../assets/images/emptyfavorite.png")
+            }
+            style={styles.favorite}
+          />
+        </TouchableOpacity>
         <Text style={styles.recipeTitle}>{title}</Text>
         <TouchableOpacity onPress={toggleVisibility} style={styles.toggle}>
           <Image source={isVisible?require("../assets/images/toggleup.png"):require("../assets/images/toggledown.png")}/>
