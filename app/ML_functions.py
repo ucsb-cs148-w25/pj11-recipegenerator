@@ -172,9 +172,22 @@ def generate_delicious_recipes(ingredients_list):
             try:
                 # Attempt to parse the JSON arguments provided by the model
                 parsed_args = json.loads(arguments_str)
-                return parsed_args  # Return the structured data
+                recipe1_name = parsed_args["recipe1"]["name"]
+                recipe1_description = parsed_args["recipe1"]["description"]
+                recipe2_name = parsed_args["recipe2"]["name"]
+                recipe2_description = parsed_args["recipe2"]["description"]
+                recipe3_name = parsed_args["recipe3"]["name"]
+                recipe3_description = parsed_args["recipe3"]["description"]
+
+
+                # list_of_recipes = [recipe1_name+'\n'+recipe1_description, recipe2_name+'\n'+recipe2_description, recipe3_name+'\n'+recipe3_description] #USE THIS ONCE FIXED
+                recipe_string = recipe1_name+'\n'+recipe1_description+'\n\n'+recipe2_name+'\n'+recipe2_description+'\n\n'+recipe3_name+'\n'+recipe3_description #TEMP FIX
+                return recipe_string  # Return the structured data
+
+
             except json.JSONDecodeError:
                 # If the model messed up, return the raw arguments
+
                 return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
         else:
             # If no function_call was used, fallback to raw content
