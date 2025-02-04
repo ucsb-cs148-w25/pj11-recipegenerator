@@ -8,6 +8,14 @@ easy to understand and maintain.
 from pydantic import BaseModel, Field
 from typing import List
 
+class FavoriteRecipe(BaseModel):
+    title: str
+    description: str
+    isFavorited: bool  # Indicates if the recipe is favorited
+
+class RemoveFavoriteRequest(BaseModel):
+    title: str  # Only expecting title when removing
+    
 class FridgeItem(BaseModel):
     """
     Model for an item as stored in the fridge, including the unique identifier
