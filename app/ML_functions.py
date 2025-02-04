@@ -20,14 +20,11 @@ NOTE:
 import os
 import base64
 import json
-from dotenv import load_dotenv
 import openai
 from openai import OpenAI
 
-# Load environment variables from .env file
-load_dotenv()
-
 def generate_delicious_recipes(ingredients_list):
+
     """
     This function uses OpenAI's '4o mini model' to generate a list of three 
     delicious recipes based on the user's ingredient list.
@@ -39,13 +36,15 @@ def generate_delicious_recipes(ingredients_list):
       1) Validate the input list and each item in it.
       2) Format the ingredients into a comma-separated string.
       3) Construct a user prompt to request recipes.
-      4) Make a call to the OpenAI ChatCompletion endpoint 
-         (using parameters compatible with o1 models).
-      5) Return the model's generated text as the result.
+      4) Make a call to the OpenAI ChatCompletion endpoint, including a 
+         function specification so that the model can directly return
+         structured data (function calling).
+      5) Return the structured JSON from the model's function call.
 
     :param ingredients_list: A list of tuples. Each tuple includes a string 
                             (ingredient name) and an integer (quantity).
-    :return: A string containing three recipe suggestions from the OpenAI model.
+    :return: A dictionary containing three recipe objects if function call 
+             is successful. Otherwise, a fallback string of the response.
     """
 
     # --- Step 1: Error checking and validation --- #
@@ -71,44 +70,118 @@ def generate_delicious_recipes(ingredients_list):
         f"{ingredient} ({quantity})" for ingredient, quantity in ingredients_list
     ])
 
-    # --- Step 3: Construct a user prompt to request recipes --- #
+    # --- Step 3: Construct the user prompt to request recipes --- #
     prompt_text = (
         "You are a recipe creator. The user has the following ingredients in their freezer:\n"
         f"{formatted_ingredients}\n"
         "Propose a list of three delicious recipes that could be made from these ingredients. "
-        "It is not mandatory to use all ingredients. For each recipe, give a short name and a one-line description. "
-        "Return them as a list, for example:\n"
-        "1) <Recipe Name>: <Description>\n"
-        "2) ...\n"
-        "3) ...\n"
+        "It is not mandatory to use all ingredients. For each recipe, give a short name and a detailed, step by step recipe."
     )
 
-    # --- Call the OpenAI API --- #
+    # --- Define the functions parameter for structured JSON --- #
+    functions = [
+        {
+            "name": "create_recipe_list",
+            "description": "Return three recipes, each with a short name and one-line description",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "recipe1": {
+                        "type": "object",
+                        "description": "Information about the first recipe",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The short name of the recipe"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Detailed, step by step recipe"
+                            }
+                        },
+                        "required": ["name", "description"]
+
+                    },
+                    "recipe2": {
+                        "type": "object",
+                        "description": "Information about the second recipe",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The short name of the recipe"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Detailed, step by step recipe"
+                            }
+                        },
+                        "required": ["name", "description"]
+
+                    },
+                    "recipe3": {
+                        "type": "object",
+                        "description": "Information about the third recipe",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The short name of the recipe"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Detailed, step by step recipe"
+                            }
+                        },
+                        "required": ["name", "description"]
+
+                    }
+                },
+                "required": ["recipe1", "recipe2", "recipe3"]
+            }
+        }
+    ]
+
+    # --- Step 4: Make the API call to OpenAI with function calling --- #
     try:
-        # Initialize the OpenAI client with your API key
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # Make the API call using the client
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Initialize the OpenAI client
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "developer", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt_text}
             ],
-            max_completion_tokens=300,
+            functions=functions,
+            function_call={"name": "create_recipe_list"},  # Let the model create or skip function calls as it sees fit
+            max_completion_tokens=2000,
             temperature=0.7
+
         )
     except Exception as e:
         raise RuntimeError(f"OpenAI API call failed: {e}")
 
-    # --- Process the response --- #
+    # --- Step 5: Retrieve and parse the function call from the response --- #
     try:
-        # Extract the first completion's content using the new client response format
-        model_output = response.choices[0].message.content.strip()
+        # Fetch the role to check if the assistant has called the function
+        role = response.choices[0].message.role
+
+        # If the assistant used the function_call approach
+        if hasattr(response.choices[0].message, "function_call"):
+            function_call_data = response.choices[0].message.function_call
+            # The 'name' should be the function we defined, and the arguments are in JSON format
+            arguments_str = function_call_data.arguments
+
+            try:
+                # Attempt to parse the JSON arguments provided by the model
+                parsed_args = json.loads(arguments_str)
+                return parsed_args  # Return the structured data
+            except json.JSONDecodeError:
+                # If the model messed up, return the raw arguments
+                return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
+        else:
+            # If no function_call was used, fallback to raw content
+            return {"fallback_content": response.choices[0].message.content.strip()}
+
     except (IndexError, AttributeError) as e:
         raise RuntimeError(f"Unexpected response format from OpenAI API: {e}")
-
-    return model_output
 
 
 def extract_recipe_from_image(image_data: bytes) -> str:
