@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Image,
   View,
@@ -10,12 +10,25 @@ import {
   Alert,
 } from "react-native";
 
-function Recipe({ title, description , fetchSavedRecipes }) {
+function Recipe({ title, description, fetchSavedRecipes }) {
   const [isVisible, setIsVisible] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
 
-  const toggleVisibility = () => {
-    setIsVisible(!isVisible);
+  useEffect(() => {
+    checkIfFavorited();
+  }, []);
+
+  const checkIfFavorited = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/get_favorite_recipes");
+      if (!response.ok) throw new Error("Failed to fetch saved recipes.");
+
+      const data = await response.json();
+      const isRecipeFavorited = data.some((recipe) => recipe.title === title);
+      setIsFavorited(isRecipeFavorited);
+    } catch (error) {
+      console.error("Error checking favorite status:", error);
+    }
   };
 
   const toggleFavorite = async () => {
@@ -26,12 +39,10 @@ function Recipe({ title, description , fetchSavedRecipes }) {
         body: JSON.stringify({ title, description, isFavorited: !isFavorited }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to update favorite status.");
-      }
+      if (!response.ok) throw new Error("Failed to update favorite status.");
 
       setIsFavorited(!isFavorited);
-      fetchSavedRecipes(); 
+      fetchSavedRecipes();
     } catch (error) {
       console.error("Error updating favorite status:", error);
     }
@@ -51,7 +62,7 @@ function Recipe({ title, description , fetchSavedRecipes }) {
           />
         </TouchableOpacity>
         <Text style={styles.recipeTitle}>{title}</Text>
-        <TouchableOpacity onPress={toggleVisibility} style={styles.toggle}>
+        <TouchableOpacity onPress={() => setIsVisible(!isVisible)} style={styles.toggle}>
           <Image
             source={
               isVisible
@@ -75,22 +86,20 @@ export default function RecipePage() {
     try {
       const response = await fetch("http://127.0.0.1:8000/fridge/generate_recipes", {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
       const data = await response.json();
       if (data.recipes) {
-        const recipeList = data.recipes.split("\n\n").map((recipe) => {
-          const [title, description] = recipe.split(": ");
-          return { title: title.replace(/\d+\)\s*/, ""), description };
+        const formattedRecipes = data.recipes.split("\n\n").map((recipe) => {
+          const splitIndex = recipe.indexOf("\n");
+          const title = recipe.substring(0, splitIndex);
+          const description = recipe.substring(splitIndex + 1).trim();
+          return { title, description };
         });
-        setRecipes(recipeList);
+        setRecipes(formattedRecipes);
       }
     } catch (error) {
       Alert.alert("Error", "Failed to generate recipes. Please try again later.");
@@ -101,7 +110,7 @@ export default function RecipePage() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Saved Recipes</Text>
+      <Text style={styles.title}>Generated Recipes</Text>
 
       <ScrollView
         style={styles.recipesContainer}
@@ -109,7 +118,7 @@ export default function RecipePage() {
       >
         {recipes.length > 0 ? (
           recipes.map((recipe, index) => (
-            <Recipe key={index} title={recipe.title} description={recipe.description} />
+            <Recipe key={index} title={recipe.title} description={recipe.description} fetchSavedRecipes={generateRecipes} />
           ))
         ) : (
           <Text style={styles.noRecipes}>No recipes available. Generate some!</Text>
@@ -123,11 +132,7 @@ export default function RecipePage() {
           activeOpacity={0.8}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>Generate Recipes</Text>
-          )}
+          {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Generate Recipes</Text>}
         </TouchableOpacity>
       </View>
     </View>
