@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 
-function Recipe({ title, description }) {
+function Recipe({ title, description , fetchSavedRecipes }) {
   const [isVisible, setIsVisible] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
 
@@ -31,6 +31,7 @@ function Recipe({ title, description }) {
       }
 
       setIsFavorited(!isFavorited);
+      fetchSavedRecipes(); 
     } catch (error) {
       console.error("Error updating favorite status:", error);
     }

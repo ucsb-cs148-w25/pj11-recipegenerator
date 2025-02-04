@@ -30,7 +30,8 @@ from app.models import (
     GenerateSuggestionsResponse,
     GenerateRecipesResponse,
     ImageRecipeResponse,
-    FavoriteRecipe
+    FavoriteRecipe,
+    RemoveFavoriteRequest
 )
 
 
@@ -272,23 +273,53 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     # We pass the extracted recipe info into the ImageRecipeResponse model
     return ImageRecipeResponse(recipes=recipes_from_image)
 
+
+
 @app.get("/fridge/get_favorite_recipes")
 def get_favorite_recipes():
     """
     Retrieve all saved (favorited) recipes.
     """
-    favorite_recipes_cursor = db["favorite_recipes"].find()
-    favorite_recipes = [
+    favorite_recipes_cursor = favorite_recipes.find()
+    favorite_recipes_list = [
         {
             "id": str(recipe["_id"]),
             "title": recipe["title"],
-            "lastCooked": recipe.get("lastCooked", "N/A"),
-            "timesCooked": recipe.get("timesCooked", 1),
-            "rating": recipe.get("rating", None),
-            "notes": recipe.get("notes", ""),
+            "description": recipe.get("description", ""),
         }
         for recipe in favorite_recipes_cursor
     ]
     
-    return favorite_recipes
+    return favorite_recipes_list
 
+@app.post("/recipes/favorite")
+def favorite_recipe(recipe: FavoriteRecipe):
+    """
+    Add or remove a recipe from favorites.
+    If `isFavorited` is True, add it to favorites.
+    If `isFavorited` is False, remove it.
+    """
+    if recipe.isFavorited:
+        favorite_recipes.update_one(
+            {"title": recipe.title},
+            {"$set": {"description": recipe.description}},
+            upsert=True
+        )
+        return {"message": f"Added {recipe.title} to favorites"}
+    else:
+        favorite_recipes.delete_one({"title": recipe.title})
+        return {"message": f"Removed {recipe.title} from favorites"}
+
+
+
+@app.post("/fridge/remove_favorite_recipe")
+def remove_favorite_recipe(recipe: RemoveFavoriteRequest):
+    """
+    Remove a recipe from favorites by title.
+    """
+    result = favorite_recipes.delete_one({"title": recipe.title})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    return {"message": f"Removed {recipe.title} from favorites"}
