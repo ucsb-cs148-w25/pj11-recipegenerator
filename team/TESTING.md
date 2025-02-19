@@ -118,5 +118,6 @@ def test_update_quantity():
 - Expand tests to cover edge cases (e.g., removing an item that doesn’t exist).
 - Implement testing for the image upload feature.
 - Add frontend UI snapshot tests.
+- Implement end-to-end testing to simulate full user experience.
 
 ---
