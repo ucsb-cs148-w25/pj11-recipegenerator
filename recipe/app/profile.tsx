@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   modalTitle: {
     fontSize: 20,
@@ -252,8 +252,9 @@ const styles = StyleSheet.create({
   closeButton: {
     marginTop: 15,
     backgroundColor: '#1A535C',
-    padding: 10,
+    padding: 15,
     borderRadius: 10,
+    alignSelf: 'flex-end',
   },
   closeButtonText: {
     color: 'white',
