@@ -29,6 +29,7 @@ For the upcoming Inter-Team Evaluation on **02/26/25**, we would like to gather 
    - **Feedback Focus**: Ability to tailor recipes to user preferences.
    - **Specific Questions**:
      - How intuitive is it to exclude specific ingredients (e.g., allergies, dislikes)?
+     - What seasoning should the AI assume user have?
      - Is it easy to set cuisine preferences (e.g., Asian, Italian, Vegan)?
      - Would users find it useful to filter recipes by cooking time or difficulty level?
    - **Proposed Evaluation Method**:
