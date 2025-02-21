@@ -67,14 +67,15 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       <View style={styles.friendsContainer}>
         {savedFriends.map((friend) => (
           <View key={friend.id} style={styles.friendsCard}>
-            <TouchableOpacity key={friend.id} style={styles.friendsCard} onPress={() => setSelectedFriend(friend)}>
             <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
-            <Text style={styles.friendName}>{friend.name}</Text>
-          </TouchableOpacity>
+            <TouchableOpacity key={friend.id} onPress={() => setSelectedFriend(friend)}>
+             <Text style={styles.friendName}>{friend.name}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.removeButton}>
               <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
           </View>
+          
         ))}
       </View>
 
