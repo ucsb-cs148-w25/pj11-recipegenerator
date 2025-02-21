@@ -1,11 +1,25 @@
 import { useState, useEffect } from "react";
-import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
+import { 
+  Image, 
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  FlatList, 
+  TouchableOpacity, 
+  ScrollView,
+  ActivityIndicator,
+  Alert 
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
 export default function FridgePage() {
   const [items, setItems] = useState([]);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [editingQuantity, setEditingQuantity] = useState({});
+  const [mlResult, setMlResult] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -73,7 +87,7 @@ export default function FridgePage() {
         const errorText = await response.text();
         throw new Error(`Error ${response.status}: ${errorText}`);
       }
-      fetchItems(); // 🔹 Refresh the item list to prevent clearing all items
+      fetchItems();
     } catch (error) {
       console.error("Error removing item completely:", error);
     }
@@ -82,8 +96,7 @@ export default function FridgePage() {
   const decrementQuantity = async (itemName, currentQuantity) => {
     try {
       if (currentQuantity > 1) {
-        const newQuantity = currentQuantity - 1; // Calculate new quantity
-  
+        const newQuantity = currentQuantity - 1;
         const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -97,24 +110,20 @@ export default function FridgePage() {
   
         setEditingQuantity((prev) => ({
           ...prev,
-          [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+          [itemName]: String(newQuantity),
         }));
-  
-        fetchItems(); // Refresh the item list
+        fetchItems();
       } else {
-        removeItemCompletely(itemName); // If last item, remove it entirely
+        removeItemCompletely(itemName);
       }
     } catch (error) {
       console.error("Error decrementing item:", error);
     }
   };
-  
 
-  
   const incrementQuantity = async (itemName, currentQuantity) => {
     try {
-      const newQuantity = currentQuantity + 1; // Increment quantity by 1
-  
+      const newQuantity = currentQuantity + 1;
       const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,19 +137,70 @@ export default function FridgePage() {
   
       setEditingQuantity((prev) => ({
         ...prev,
-        [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+        [itemName]: String(newQuantity),
       }));
-  
-      fetchItems(); // Refresh the item list after update
+      fetchItems();
     } catch (error) {
       console.error("Error incrementing quantity:", error);
     }
   };
+
+  // ----- Image Upload Functions -----
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission Denied", "Permission to access the gallery is required.");
+      return;
+    }
   
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+  
+    // Use the new property and asset array
+    if (!result.canceled) {
+      uploadImage(result.assets[0]);
+    }
+  };
+  
+
+  const uploadImage = async (photo) => {
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("image_file", {
+      uri: photo.uri,
+      name: "photo.jpg",
+      type: "image/jpeg",
+    });
+  
+    try {
+      const response = await fetch("http://127.0.0.1:8000/fridge/load_from_image", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Error uploading image");
+      const data = await response.json();
+      setMlResult(data.recipes);
+    } catch (error) {
+      Alert.alert("Upload Error", error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
+
+      {/* Display ML result if available */}
+      {mlResult && (
+        <View style={styles.mlResultContainer}>
+          <Text style={styles.mlResultTitle}>ML Result:</Text>
+          <Text style={styles.mlResultText}>{mlResult}</Text>
+        </View>
+      )}
+
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
@@ -156,8 +216,14 @@ export default function FridgePage() {
             <TextInput
               style={styles.quantityInput}
               keyboardType="numeric"
-              value={editingQuantity[item.name] !== undefined ? editingQuantity[item.name] : String(item.quantity)}
-              onChangeText={(text) => setEditingQuantity({ ...editingQuantity, [item.name]: text })}
+              value={
+                editingQuantity[item.name] !== undefined
+                  ? editingQuantity[item.name]
+                  : String(item.quantity)
+              }
+              onChangeText={(text) =>
+                setEditingQuantity({ ...editingQuantity, [item.name]: text })
+              }
               onSubmitEditing={() => updateQuantity(item.name)}
             />
             <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
@@ -166,6 +232,7 @@ export default function FridgePage() {
           </View>
         )}
       />
+
       <View style={styles.addSection}>
         <TextInput
           style={styles.input}
@@ -182,6 +249,21 @@ export default function FridgePage() {
         />
         <TouchableOpacity style={styles.addButton} onPress={addItem}>
           <Image source={require("./../assets/images/add3.png")} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Upload Image Section */}
+      <View style={styles.uploadSection}>
+        <TouchableOpacity
+          style={styles.uploadButton}
+          onPress={pickImage}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Upload Image</Text>
+          )}
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -258,5 +340,43 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderRadius: 5,
     backgroundColor: "white",
+  },
+  uploadSection: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  uploadButton: {
+    backgroundColor: "#088F8F",
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    letterSpacing: 1,
+  },
+  mlResultContainer: {
+    marginVertical: 20,
+    padding: 15,
+    backgroundColor: "#e8f0fe",
+    borderRadius: 10,
+  },
+  mlResultTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+  },
+  mlResultText: {
+    fontSize: 16,
+    color: "#333",
   },
 });
