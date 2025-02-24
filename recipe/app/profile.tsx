@@ -248,6 +248,7 @@ const styles = StyleSheet.create({
   recipeText: {
     fontSize: 16,
     marginBottom: 5,
+    color: '#1A535C',
   },
   closeButton: {
     marginTop: 15,
