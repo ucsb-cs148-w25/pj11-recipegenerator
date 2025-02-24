@@ -16,12 +16,12 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     {
       id: '1',
       name: 'Chappell Roan',
-      recipes: ['Spaghetti Carbonara', 'Avocado Toast', 'Blueberry Pancakes']
+      recipes: ['Spaghetti Carbonara', 'Avocado Toast', 'Blueberry Pancakes', 'Iced Latte']
     },
     {
       id: '2',
       name: 'Ziad Matni',
-      recipes: ['Chicken Curry', 'Beef Tacos', 'Caesar Salad']
+      recipes: ['Chicken Curry', 'Beef Tacos']
     },
     {
       id: '3',
