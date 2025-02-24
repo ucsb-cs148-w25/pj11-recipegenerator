@@ -1,5 +1,6 @@
-import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert} from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal} from "react-native";
 import { router } from 'expo-router';
+import { useState } from "react";
 import { User } from './login';
 import {GoogleSignin, statusCodes} from "@react-native-google-signin/google-signin";
 
@@ -9,18 +10,23 @@ interface ProfilePageProps {
 }
 
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
+  const [selectedFriend, setSelectedFriend] = useState<any>(null);
+  
   const savedFriends = [
     {
       id: '1',
       name: 'Chappell Roan',
+      recipes: ['Spaghetti Carbonara', 'Avocado Toast', 'Blueberry Pancakes']
     },
     {
       id: '2',
       name: 'Ziad Matni',
+      recipes: ['Chicken Curry', 'Beef Tacos', 'Caesar Salad']
     },
     {
       id: '3',
       name: 'Tobias Hollerer',
+      recipes: ['Margherita Pizza', 'Pumpkin Soup', 'Grilled Salmon']
     }
   ];
 
@@ -43,7 +49,6 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       router.replace("/login");
     }
   };
-
   return (
     <ScrollView style={styles.container}>
       <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.iconpic} />
@@ -63,11 +68,14 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         {savedFriends.map((friend) => (
           <View key={friend.id} style={styles.friendsCard}>
             <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
-            <Text style={styles.friendName}>{friend.name}</Text>
+            <TouchableOpacity key={friend.id} onPress={() => setSelectedFriend(friend)}>
+             <Text style={styles.friendName}>{friend.name}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.removeButton}>
               <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
           </View>
+          
         ))}
       </View>
 
@@ -77,6 +85,19 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       >
         <Text style={styles.buttonText}>Sign Out</Text>
       </TouchableOpacity>
+      <Modal visible={!!selectedFriend} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{selectedFriend?.name}'s Favorite Recipes</Text>
+            {selectedFriend?.recipes.map((recipe, index) => (
+              <Text key={index} style={styles.recipeText}>• {recipe}</Text>
+            ))}
+            <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedFriend(null)}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -205,5 +226,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 10,
     gap: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'flex-start',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  recipeText: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  closeButton: {
+    marginTop: 15,
+    backgroundColor: '#1A535C',
+    padding: 15,
+    borderRadius: 10,
+    alignSelf: 'flex-end',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   }
 });
