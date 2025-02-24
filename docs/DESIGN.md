@@ -1,5 +1,7 @@
 Overview system architecture diagram & associated explanation:
 
+Figma Link to UI/UX visual design, branding, experience: https://www.figma.com/design/tg9xdeLL4iKjM8ZqexYyEA/cs148?node-id=0-1&t=rzhKTAvInIZMWANL-1 
+
 <img width="766" alt="Screenshot 2025-02-24 at 2 52 27 PM" src="https://github.com/user-attachments/assets/2b5c32fb-87b1-4198-9311-351cbdb36dbf" />
 
 Description: Our architecture is simple in design and concise, so that the user experience is intuitive. The user starts with the sign in page, and is taken to their saved recipes after logging in. From this page, they can access the menu bar that connects this page, settings, recipe generation, inventory/fridge, and profile page together.
