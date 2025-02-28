@@ -1,4 +1,4 @@
-import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput} from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal} from "react-native";
 import { router } from 'expo-router';
 import { useState } from "react";
 import { User } from './login';
@@ -17,11 +17,9 @@ interface Friend {
 
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
-  const [addFriendModalVisible, setAddFriendModalVisible] = useState<boolean>(false);
-  const [newFriendName, setNewFriendName] = useState<string>('');
-  const [newFriendRecipe, setNewFriendRecipe] = useState<string>('');
-  const [newFriendRecipes, setNewFriendRecipes] = useState<string[]>([]);
+  const [suggestedFriendsModalVisible, setSuggestedFriendsModalVisible] = useState<boolean>(false);
   
+  // Current friends list
   const [friends, setFriends] = useState<Friend[]>([
     {
       id: '1',
@@ -40,37 +38,41 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   ]);
 
+  // Suggested friends list (would come from API in a real app)
+  const suggestedFriends: Friend[] = [
+    {
+      id: '4',
+      name: 'Taylor Swift',
+      recipes: ['Vegetable Stir Fry', 'Chocolate Chip Cookies', 'Mushroom Risotto']
+    },
+    {
+      id: '5',
+      name: 'Ariana Grande',
+      recipes: ['Chicken Alfredo', 'Greek Salad', 'Banana Bread']
+    },
+    {
+      id: '6',
+      name: 'Minecraft Steve',
+      recipes: ['Suspicious Stew', 'Milk Bucket', 'Awkward Potion']
+    }
+  ];
+
+  // Filter out friends that are already added
+  const filteredSuggestedFriends = suggestedFriends.filter(
+    suggestedFriend => !friends.some(friend => friend.id === suggestedFriend.id)
+  );
+
   const handleRemoveFriend = (friendId: string) => {
     setFriends(friends.filter(friend => friend.id !== friendId));
   };
 
-  const handleAddRecipe = () => {
-    if (newFriendRecipe.trim()) {
-      setNewFriendRecipes([...newFriendRecipes, newFriendRecipe.trim()]);
-      setNewFriendRecipe('');
+  const handleAddFriend = (friendToAdd: Friend) => {
+    setFriends([...friends, friendToAdd]);
+    Alert.alert("Success", `${friendToAdd.name} has been added to your friends!`);
+    // Close modal if there are no more suggested friends
+    if (filteredSuggestedFriends.length === 1) {
+      setSuggestedFriendsModalVisible(false);
     }
-  };
-
-  const handleAddFriend = () => {
-    if (!newFriendName.trim()) {
-      Alert.alert("Error", "Please enter a friend name");
-      return;
-    }
-
-    const newFriend: Friend = {
-      id: (friends.length + 1).toString(),
-      name: newFriendName.trim(),
-      recipes: newFriendRecipes.length > 0 ? newFriendRecipes : ['No favorite recipes yet']
-    };
-
-    setFriends([...friends, newFriend]);
-    
-    // Reset the form
-    setNewFriendName('');
-    setNewFriendRecipes([]);
-    setAddFriendModalVisible(false);
-    
-    Alert.alert("Success", `${newFriend.name} has been added to your friends!`);
   };
 
   const handleSignOut = async () => {
@@ -103,7 +105,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Friends</Text>
-        <TouchableOpacity onPress={() => setAddFriendModalVisible(true)}>
+        <TouchableOpacity onPress={() => setSuggestedFriendsModalVisible(true)}>
           <Image source={require('../assets/images/addfriend.png')} />
         </TouchableOpacity>
       </View>
@@ -146,59 +148,43 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         </View>
       </Modal>
 
-      {/* Add Friend Modal */}
-      <Modal visible={addFriendModalVisible} transparent animationType="slide">
+      {/* Suggested Friends Modal */}
+      <Modal visible={suggestedFriendsModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add a New Friend</Text>
+            <Text style={styles.modalTitle}>Suggested Friends</Text>
             
-            <Text style={styles.inputLabel}>Friend's Name:</Text>
-            <TextInput
-              style={styles.input}
-              value={newFriendName}
-              onChangeText={setNewFriendName}
-              placeholder="Enter friend's name"
-            />
+            {filteredSuggestedFriends.length > 0 ? (
+              filteredSuggestedFriends.map((suggestedFriend) => (
+                <View key={suggestedFriend.id} style={styles.suggestedFriendCard}>
+                  <Image 
+                    source={require('../assets/images/defaultprofilepic.png')} 
+                    style={styles.suggestedFriendIcon} 
+                  />
+                  <View style={styles.suggestedFriendInfo}>
+                    <Text style={styles.suggestedFriendName}>{suggestedFriend.name}</Text>
+                    <Text style={styles.suggestedFriendRecipeCount}>
+                      {suggestedFriend.recipes.length} favorite recipes
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.addButton} 
+                    onPress={() => handleAddFriend(suggestedFriend)}
+                  >
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noFriendsText}>No more suggested friends available</Text>
+            )}
             
-            <Text style={styles.inputLabel}>Favorite Recipes:</Text>
-            {newFriendRecipes.map((recipe, index) => (
-              <Text key={index} style={styles.recipeText}>• {recipe}</Text>
-            ))}
-            
-            <View style={styles.recipeInputContainer}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                value={newFriendRecipe}
-                onChangeText={setNewFriendRecipe}
-                placeholder="Add a favorite recipe"
-              />
-              <TouchableOpacity 
-                style={styles.addRecipeButton}
-                onPress={handleAddRecipe}
-              >
-                <Text style={styles.addRecipeButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.closeButton, { backgroundColor: '#FF6B6B' }]} 
-                onPress={() => {
-                  setNewFriendName('');
-                  setNewFriendRecipes([]);
-                  setAddFriendModalVisible(false);
-                }}
-              >
-                <Text style={styles.closeButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.closeButton, { backgroundColor: '#4CAF50' }]} 
-                onPress={handleAddFriend}
-              >
-                <Text style={styles.closeButtonText}>Save Friend</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              style={[styles.closeButton, { marginTop: 20 }]} 
+              onPress={() => setSuggestedFriendsModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -342,14 +328,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
+    width: '85%',
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#1A535C',
@@ -361,51 +348,65 @@ const styles = StyleSheet.create({
     color: '#1A535C',
   },
   closeButton: {
-    marginTop: 15,
     backgroundColor: '#1A535C',
     padding: 10,
     borderRadius: 10,
-    alignSelf: 'flex-end',
+    alignSelf: 'center',
   },
   closeButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    width: '100%',
-    backgroundColor: '#f9f9f9',
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A535C',
-    marginBottom: 5,
-    marginTop: 5,
-  },
-  recipeInputContainer: {
+  suggestedFriendCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#F0F8FF',
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 10,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  addRecipeButton: {
-    backgroundColor: '#1A535C',
-    padding: 10,
-    borderRadius: 5,
-    marginLeft: 5,
+  suggestedFriendIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
   },
-  addRecipeButtonText: {
+  suggestedFriendInfo: {
+    flex: 1,
+  },
+  suggestedFriendName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A535C',
+  },
+  suggestedFriendRecipeCount: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 3,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  addButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
+  noFriendsText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+    marginVertical: 20,
   }
 });
