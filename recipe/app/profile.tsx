@@ -12,7 +12,7 @@ interface ProfilePageProps {
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [selectedFriend, setSelectedFriend] = useState<any>(null);
   
-  const savedFriends = [
+  const [friends, setFriends] = useState([
     {
       id: '1',
       name: 'Chappell Roan',
@@ -28,7 +28,11 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       name: 'Tobias Hollerer',
       recipes: ['Margherita Pizza', 'Pumpkin Soup', 'Grilled Salmon']
     }
-  ];
+  ]);
+
+  const handleRemoveFriend = (friendId: string) => {
+    setFriends(friends.filter(friend => friend.id !== friendId));
+  };
 
   const handleSignOut = async () => {
     try {
@@ -65,18 +69,17 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         </TouchableOpacity>
       </View>
       <View style={styles.friendsContainer}>
-        {savedFriends.map((friend) => (
+        {friends.map((friend) => (
           <View key={friend.id} style={styles.friendsCard}>
             <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
-            <TouchableOpacity key={friend.id} onPress={() => setSelectedFriend(friend)}>
-             <Text style={styles.friendName}>{friend.name} </Text>
-             <Text style={styles.friendText}>See what they're cooking here!</Text>
+            <TouchableOpacity onPress={() => setSelectedFriend(friend)}>
+              <Text style={styles.friendName}>{friend.name}</Text>
+              <Text style={styles.friendText}>See their faves!</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.removeButton}>
+            <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveFriend(friend.id)}>
               <Text style={styles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
           </View>
-          
         ))}
       </View>
 
@@ -157,12 +160,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1A535C',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   friendText: {
     fontSize: 14,
     color: '#1A535C',
-    paddingRight: 15,
   },
   removeButton: {
     backgroundColor: '#1A535C',
