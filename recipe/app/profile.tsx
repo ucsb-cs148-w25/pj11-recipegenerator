@@ -68,7 +68,6 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
   const handleAddFriend = (friendToAdd: Friend) => {
     setFriends([...friends, friendToAdd]);
-    Alert.alert("Success", `${friendToAdd.name} has been added to your friends!`);
     // Close modal if there are no more suggested friends
     if (filteredSuggestedFriends.length === 1) {
       setSuggestedFriendsModalVisible(false);
@@ -269,7 +268,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   addButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1A535C',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
