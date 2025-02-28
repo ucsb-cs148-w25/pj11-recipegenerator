@@ -1,6 +1,6 @@
 {
-  "short_name": "RecipeGenerator",
-  "name": "Recipe Generator",
+  "short_name": "RecipeAI",
+  "name": "Recipe Ai",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
