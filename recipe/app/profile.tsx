@@ -69,7 +69,8 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
           <View key={friend.id} style={styles.friendsCard}>
             <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
             <TouchableOpacity key={friend.id} onPress={() => setSelectedFriend(friend)}>
-             <Text style={styles.friendName}>{friend.name}</Text>
+             <Text style={styles.friendName}>{friend.name} </Text>
+             <Text style={styles.friendText}>See what they're cooking here!</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.removeButton}>
               <Text style={styles.removeButtonText}>Remove</Text>
@@ -157,6 +158,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A535C',
     marginBottom: 8,
+  },
+  friendText: {
+    fontSize: 14,
+    color: '#1A535C',
+    paddingRight: 15,
   },
   removeButton: {
     backgroundColor: '#1A535C',
