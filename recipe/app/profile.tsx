@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     maxHeight: '80%',
   },
   modalTitle: {
@@ -346,6 +346,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 5,
     color: '#1A535C',
+    paddingLeft: 30,
   },
   closeButton: {
     backgroundColor: '#1A535C',
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   suggestedFriendCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#F6FFF7',
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
