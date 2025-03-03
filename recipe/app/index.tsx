@@ -13,7 +13,7 @@ export default function Homepage() {
     try {
       const response = await fetch("http://127.0.0.1:8000/fridge/get_favorite_recipes");
       if (!response.ok) {
-        throw new Error("Failed to fetch saved recipes.");
+        throw new Error("Failed to fetch favorite recipes.");
       }
 
       const data = await response.json();
