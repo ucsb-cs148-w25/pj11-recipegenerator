@@ -89,13 +89,14 @@ class ImageRecipeResponse(BaseModel):
     Model for the response returned by the /fridge/load_from_image endpoint.
     Contains a structured list of ingredients detected in the image.
     """
-    ingredients: list = Field(..., description="List of ingredients with quantities detected in the image")
+    ingredients: List[dict] = Field(..., description="List of ingredients with quantities detected in the image")
 
 
-class ImageRecipeResponse(BaseModel):
-    """
-    Model for the response returned by the /fridge/image/recipes endpoint.
-    Contains recipe-related information derived from the uploaded image data.
-    """
-    # This field contains the string output of the ML model's recipe extraction from an image
-    recipes: str = Field(..., description="Recipes generated from analyzing the uploaded image.") 
+# Remove or comment out the duplicate model definition that's causing conflicts
+# class ImageRecipeResponse(BaseModel):
+#     """
+#     Model for the response returned by the /fridge/image/recipes endpoint.
+#     Contains recipe-related information derived from the uploaded image data.
+#     """
+#     # This field contains the string output of the ML model's recipe extraction from an image
+#     recipes: str = Field(..., description="Recipes generated from analyzing the uploaded image.") 
