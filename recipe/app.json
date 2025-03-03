@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "StickerSmash",
-    "slug": "StickerSmash",
+    "name": "RecipeAI",
+    "slug": "RecipeAI",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,14 +10,14 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "scheme": "stickersmash",
+    "scheme": "RecipeAI",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "platforms": ["ios", "android", "web"],
     "plugins": ["@react-native-google-signin/google-signin"],
     "ios": {
       "icon": "./assets/icon.png",
-      "bundleIdentifier": "com.jasoninthebox.StickerSmash",
+      "bundleIdentifier": "com.jasoninthebox.RecipeAI",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
@@ -34,11 +34,11 @@
         "foregroundImage": "./assets/app_icon/android/res/mipmap-mdpi/ic_launcher_foreground.png",
         "backgroundImage": "./assets/app_icon/android/res/mipmap-hdpi/ic_launcher_background.png"
       },
-      "package": "com.jasoninthebox.StickerSmash",
+      "package": "com.jasoninthebox.RecipeAI",
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "stickersmash" }],
+          "data": [{ "scheme": "RecipeAI" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
@@ -46,8 +46,8 @@
     "web": {
       "favicon": "./assets/app_icon/web/favicon.png",
       "manifest": {
-        "short_name": "StickerSmash",
-        "name": "StickerSmash",
+        "short_name": "RecipeAI",
+        "name": "RecipeAI",
         "start_url": ".",
         "display": "standalone",
         "background_color": "#ffffff",
