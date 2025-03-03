@@ -10,11 +10,17 @@ We configure the docs to show at the root URL ("/") by setting docs_url="/".
 We also remove or repurpose the existing root endpoint to avoid conflicts.
 """
 
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import login
+from pydantic import BaseModel
+
+
+# Import `get_current_user` from `login.py`
+from app.routers.login import get_current_user
 
 # Import the ML functions
 from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
@@ -26,16 +32,14 @@ from app.models import (
     FridgeItem,
     AddItemResponse,
     RemoveItemResponse,
-    UpdateItemResponse,
     GenerateSuggestionsResponse,
     GenerateRecipesResponse,
-    ImageRecipeResponse,
-    FavoriteRecipe,
-    RemoveFavoriteRequest
+    ImageRecipeResponse
 )
 
-
-
+class Item(BaseModel):
+    name: str
+    quantity: int 
 
 # MongoDB URI
 # uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
@@ -46,8 +50,9 @@ client = MongoClient(uri, server_api=ServerApi('1'))
 db = client["fridge"]
 fridge_items = db["fridge_items"]
 
-# Connect to MongoDB collections
-favorite_recipes = db["favorite_recipes"]
+# Secret Key
+SECRET_KEY = "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"
+ALGORITHM = "HS256"
 
 # -----------------------------------------------------------------------------
 # 1) Configure the FastAPI instance so that docs_url="/" serves the Swagger UI.
@@ -59,14 +64,18 @@ app = FastAPI(
     redoc_url="/redoc"            # Keep or remove ReDoc by setting it to None
 )
 
-
+# Allow requests from anywhere (development convenience).
+# In production, configure this carefully or set a specific domain.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (change this later for security)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(login.router)
 
 def unpack_item(item: dict) -> FridgeItem:
     """
@@ -77,6 +86,7 @@ def unpack_item(item: dict) -> FridgeItem:
     """
     # Construct a FridgeItem model from the MongoDB document
     return FridgeItem(
+        user_id=str(item.get("user_id", "unknown")),
         id=str(item["_id"]),
         name=item["name"],
         quantity=item["quantity"]
@@ -102,102 +112,109 @@ def opening_page():
     return OpeningPageResponse(Message="Welcome to the fridge app!")
 
 @app.get("/fridge/get", response_model=list[FridgeItem])
-def get_items():
+def get_items(user_id: str = Depends(get_current_user)):
     """
     Retrieve all items in the fridge. Each item is represented 
     by the FridgeItem model.
     """
-    items_cursor = fridge_items.find()  # Query all items from the DB
+    # Query only the item correcponding to the user_id
+    items_cursor = fridge_items.find({"user_id": user_id}) 
     # Convert each MongoDB document into a FridgeItem using unpack_item
     return [unpack_item(item) for item in items_cursor]
 
+# @app.post("/fridge/add", response_model=AddItemResponse)
+# def add_item(item: Item, user_id: str = Depends(get_current_user)):
+#     """
+#     Add an item to the fridge. The request body is validated by Item. 
+#     Response is enforced by AddItemResponse.
+    
+#     Steps:
+#       1) If the item already exists, increment its quantity.
+#       2) Otherwise, create a new document with the given name/quantity.
+#       3) Retrieve all items afterward and return them in the response.
+#     """
+#     # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
+#     fridge_items.update_one(
+#         {"user_id": user_id, "name": item.name},
+#         {"$inc": {"quantity": item.quantity}},
+#         upsert=True
+#     )
+#     # Get the updated list of items in the fridge
+#     all_items_fridge = get_items(item.user_id)  # This will return a list[FridgeItem]
+    
+#     # Return a response that includes a short message and the updated item list
+#     return AddItemResponse(
+#         message=f"{item.quantity} {item.name}(s) added to the fridge.",
+#         all_items=all_items_fridge
+#     )
+
 @app.post("/fridge/add", response_model=AddItemResponse)
-def add_item(item: Item):
+def add_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Add an item to the fridge. The request body is validated by Item. 
     Response is enforced by AddItemResponse.
-    
-    Steps:
-      1) If the item already exists, increment its quantity.
-      2) Otherwise, create a new document with the given name/quantity.
-      3) Retrieve all items afterward and return them in the response.
     """
-    # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
+    # Upsert the item in the database using `user_id` from JWT
     fridge_items.update_one(
-        {"name": item.name},
+        {"user_id": user_id, "name": item.name},
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
-    # Get the updated list of items in the fridge
-    all_items_fridge = get_items()  # This will return a list[FridgeItem]
+
+    print(f"Authenticated user: {user_id}")
     
-    # Return a response that includes a short message and the updated item list
+    # Get the updated list of items
+    all_items_fridge = get_items(user_id)
+    
     return AddItemResponse(
         message=f"{item.quantity} {item.name}(s) added to the fridge.",
         all_items=all_items_fridge
     )
 
-
 @app.post("/fridge/remove", response_model=RemoveItemResponse)
-def remove_item(item: Item):
+def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     """
-    Remove an item from the fridge.
+    Remove an item from the fridge. The request body is validated by Item. 
+    Response is enforced by RemoveItemResponse.
+    
+    Steps:
+      1) Ensure the item exists in the fridge.
+      2) Check that the fridge contains enough quantity.
+      3) Subtract the item quantity or remove the document if it goes to zero.
     """
-    existing_item = fridge_items.find_one({"name": item.name})
+    existing_item = fridge_items.find_one({"user_id": user_id, "name": item.name})
+
     if not existing_item:
+        # If the item doesn't exist, raise a 404 error
         raise HTTPException(status_code=404, detail="Item not found in the fridge.")
 
-    if item.quantity == 1000000000:  # Remove entire item
-        fridge_items.delete_one({"name": item.name})
-        message = f"{item.name} completely removed."
+    # Validate that quantity is sufficient
+    if existing_item["quantity"] < item.quantity:
+        raise HTTPException(status_code=400, detail="Not enough items in the fridge.")
+    
+    # Decrease the quantity or delete the item
+    new_quantity = existing_item["quantity"] - item.quantity
+    if new_quantity > 0:
+        fridge_items.update_one({"user_id": user_id, "name": item.name}, {"$set": {"quantity": new_quantity}})
     else:
-        if existing_item["quantity"] < item.quantity:
-            raise HTTPException(status_code=400, detail="Not enough items in the fridge.")
-        new_quantity = existing_item["quantity"] - item.quantity
-        if new_quantity > 0:
-            fridge_items.update_one({"name": item.name}, {"$set": {"quantity": new_quantity}})
-            message = f"Decremented {item.name} by {item.quantity}."
-        else:
-            fridge_items.delete_one({"name": item.name})
-            message = f"{item.name} removed."
-
+        fridge_items.delete_one({"user_id": user_id, "name": item.name})
+    
+    all_items_fridge = get_items(user_id)
+    # Return a confirmation message
     return RemoveItemResponse(
-        message=message,
-        all_items=get_items()
+        message=f"{item.quantity} {item.name}(s) removed from the fridge.",
+        all_items=all_items_fridge
     )
-
-@app.post("/fridge/update_quantity", response_model=UpdateItemResponse)
-def update_quantity(item: Item):
-    """
-    Update the quantity of an item in the fridge.
-    """
-    existing_item = fridge_items.find_one({"name": item.name})
-
-    if not existing_item:
-        raise HTTPException(status_code=404, detail="Item not found in the fridge.")
-
-    if item.quantity <= 0:
-        fridge_items.delete_one({"name": item.name})
-        message = f"{item.name} removed from the fridge."
-    else:
-        fridge_items.update_one({"name": item.name}, {"$set": {"quantity": item.quantity}})
-        message = f"{item.name} quantity updated to {item.quantity}."
-
-    return UpdateItemResponse(
-        message=message,
-        all_items=get_items()
-    )
-
 
 @app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
-def generate_suggestions():
+def generate_suggestions(user_id: str = Depends(get_current_user)):
     """
     Generate item-based suggestions based on what is currently in the fridge. 
     Response is enforced by GenerateSuggestionsResponse.
     
     If the fridge is empty, raises a 400 error.
     """
-    items_cursor = fridge_items.find()
+    items_cursor = fridge_items.find({"user_id": user_id})
     item_names = [doc["name"] for doc in items_cursor]
 
     if not item_names:
@@ -211,7 +228,7 @@ def generate_suggestions():
     return GenerateSuggestionsResponse(suggestions=suggestions)
 
 @app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
-def generate_recipes():
+def generate_recipes(user_id: str = Depends(get_current_user)):
     """
     Generate three recipe suggestions based on current fridge contents using an ML function.
     Response is enforced by GenerateRecipesResponse.
@@ -219,7 +236,7 @@ def generate_recipes():
     Raises a 400 error if the fridge is empty, or a 500 error if recipe generation fails.
     """
     # Get all items from the fridge as (name, quantity) tuples
-    items_cursor = fridge_items.find()
+    items_cursor = fridge_items.find({"user_id": user_id})
     fridge_contents = [(doc["name"], doc["quantity"]) for doc in items_cursor]
 
     if not fridge_contents:
@@ -272,54 +289,3 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     # --- Step 4: Return the result in the ImageRecipeResponse model --- #
     # We pass the extracted recipe info into the ImageRecipeResponse model
     return ImageRecipeResponse(recipes=recipes_from_image)
-
-
-
-@app.get("/fridge/get_favorite_recipes")
-def get_favorite_recipes():
-    """
-    Retrieve all saved (favorited) recipes.
-    """
-    favorite_recipes_cursor = favorite_recipes.find()
-    favorite_recipes_list = [
-        {
-            "id": str(recipe["_id"]),
-            "title": recipe["title"],
-            "description": recipe.get("description", ""),
-        }
-        for recipe in favorite_recipes_cursor
-    ]
-    
-    return favorite_recipes_list
-
-@app.post("/recipes/favorite")
-def favorite_recipe(recipe: FavoriteRecipe):
-    """
-    Add or remove a recipe from favorites.
-    If `isFavorited` is True, add it to favorites.
-    If `isFavorited` is False, remove it.
-    """
-    if recipe.isFavorited:
-        favorite_recipes.update_one(
-            {"title": recipe.title},
-            {"$set": {"description": recipe.description}},
-            upsert=True
-        )
-        return {"message": f"Added {recipe.title} to favorites"}
-    else:
-        favorite_recipes.delete_one({"title": recipe.title})
-        return {"message": f"Removed {recipe.title} from favorites"}
-
-
-
-@app.post("/fridge/remove_favorite_recipe")
-def remove_favorite_recipe(recipe: RemoveFavoriteRequest):
-    """
-    Remove a recipe from favorites by title.
-    """
-    result = favorite_recipes.delete_one({"title": recipe.title})
-
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Recipe not found")
-
-    return {"message": f"Removed {recipe.title} from favorites"}

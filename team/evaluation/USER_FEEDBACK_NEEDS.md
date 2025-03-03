@@ -20,6 +20,7 @@ For the upcoming Inter-Team Evaluation on **02/26/25**, we would like to gather 
      - Is the home page visually appealing and easy to navigate?
      - Are recipe instructions structured clearly (step-by-step formatting, readability)?
      - Are UI elements (buttons, icons) appropriately sized and positioned for mobile users?
+     - Do users understand how to use the photo upload feature for ingredient scanning?
    - **Proposed Evaluation Method**:
      - Have evaluators navigate the app and complete tasks such as adding ingredients, generating recipes, and saving recipes.
      - Gather feedback on usability, clarity of instructions, and any confusion they experience.
@@ -28,11 +29,10 @@ For the upcoming Inter-Team Evaluation on **02/26/25**, we would like to gather 
    - **Feedback Focus**: Ability to tailor recipes to user preferences.
    - **Specific Questions**:
      - How intuitive is it to exclude specific ingredients (e.g., allergies, dislikes)?
-     - What seasoning should the AI assume user have?
-     - Do you think adding cuisine preferences (e.g., Asian, Italian, Vegan) will be a useful feature?
+     - Is it easy to set cuisine preferences (e.g., Asian, Italian, Vegan)?
      - Would users find it useful to filter recipes by cooking time or difficulty level?
    - **Proposed Evaluation Method**:
-     - Have evaluators attempt to make recipes based on preferences.
+     - Have evaluators attempt to filter recipes based on preferences (e.g., exclude a disliked ingredient, choose a cuisine type, or select an easy recipe).
      - Collect feedback on whether these features are intuitive and effective.
 
 ## Next Steps

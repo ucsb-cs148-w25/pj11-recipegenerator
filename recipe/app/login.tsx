@@ -25,6 +25,7 @@ interface LoginProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
+
 const sendUserDataToBackend = async (idToken: string) => {
   try {
     const response = await fetch("http://localhost:8000/google-login", {
@@ -45,7 +46,7 @@ const sendUserDataToBackend = async (idToken: string) => {
 
     await AsyncStorage.setItem("token", result.token);
     await AsyncStorage.setItem("userId", decoded.sub);
-
+    
     return result;
   } catch (error) {
     console.error("Error sending user data to backend:", error);
@@ -60,7 +61,6 @@ export default function Login({ setUser }: LoginProps) {
   useEffect(() => {
     GoogleSignin.configure({
       webClientId,
-      iosClientId: "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com",
       offlineAccess: true,
     });
   }, []);
