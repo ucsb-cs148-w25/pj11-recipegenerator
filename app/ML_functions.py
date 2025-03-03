@@ -21,6 +21,7 @@ import os
 import base64
 import json
 import openai
+import requests  # Added import for fetching image from URL
 from openai import OpenAI
 
 def generate_delicious_recipes(ingredients_list):
@@ -75,14 +76,38 @@ def generate_delicious_recipes(ingredients_list):
         "You are a recipe creator. The user has the following ingredients in their freezer:\n"
         f"{formatted_ingredients}\n"
         "Propose a list of three delicious recipes that could be made from these ingredients. "
-        "It is not mandatory to use all ingredients. For each recipe, give a short name and a detailed, step by step recipe."
+        "It is not mandatory to use all ingredients. For each recipe, give a short name, the ingredients required (should only include ingredients that the user has in their freezer) and a detailed, step by step recipe.\n\n"
+        """Here is an example recipe:\n"
+"Broccoli Bacon Quiche\n\n"
+"Ingredients:\n"
+"- 4 strips of bacon, chopped into small pieces\n"
+"- 1 medium broccoli head (about 2 cups when chopped)\n"
+"- 1/2 cup grated cheddar cheese\n"
+"- 1/4 cup grated parmesan cheese\n"
+"- 4 large eggs\n"
+"- 1 cup heavy cream\n"
+"- 1 pre-made pie crust (9-inch)\n"
+"- 1/2 teaspoon salt\n"
+"- 1/4 teaspoon black pepper\n"
+"- 1/8 teaspoon nutmeg\n\n"
+"Instructions:\n"
+"1. Preheat the oven to 375°F (190°C) - 5 minutes\n"
+"2. Cook the chopped bacon in a skillet over medium heat until crispy (about 8-10 minutes). Remove with a slotted spoon and drain on paper towels.\n"
+"3. Cut the broccoli into small florets and steam until just tender (about 4-5 minutes). Let cool slightly and then roughly chop.\n"
+"4. Blind bake the pie crust for 10 minutes until lightly golden.\n"
+"5. In a large bowl, whisk together the eggs, heavy cream, salt, pepper, and nutmeg until well combined (about 2 minutes of whisking).\n"
+"6. Layer the bacon, chopped broccoli, and both cheeses in the pre-baked pie crust.\n"
+"7. Pour the egg mixture over the filling ingredients.\n"
+"8. Bake in the preheated oven for 35-40 minutes, until the center is set and the top is golden brown.\n"
+"9. Let cool for 10 minutes before slicing and serving.\n\n"
+"Please follow this example format with detailed measurements, precise timing for each step, and complete instructions for your three recipe suggestions, but in a function calling format instead."""
     )
 
     # --- Define the functions parameter for structured JSON --- #
     functions = [
         {
             "name": "create_recipe_list",
-            "description": "Return three recipes, each with a short name and one-line description",
+            "description": "Return three recipes, each with a short name and step by step recipe",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -90,16 +115,20 @@ def generate_delicious_recipes(ingredients_list):
                         "type": "object",
                         "description": "Information about the first recipe",
                         "properties": {
-                            "name": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "The short name of the recipe"
+                                },
+                            "ingredients": {
                                 "type": "string",
-                                "description": "The short name of the recipe"
+                                "description": "Detailed list of ingredients required for the recipe"
                             },
-                            "description": {
+                            "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
                             }
                         },
-                        "required": ["name", "description"]
+                        "required": ["name", "ingredients", "steps"]
 
                     },
                     "recipe2": {
@@ -110,12 +139,16 @@ def generate_delicious_recipes(ingredients_list):
                                 "type": "string",
                                 "description": "The short name of the recipe"
                             },
-                            "description": {
+                            "ingredients": {
+                                "type": "string",
+                                "description": "Detailed list of ingredients required for the recipe"
+                            },
+                            "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
                             }
                         },
-                        "required": ["name", "description"]
+                        "required": ["name", "ingredients", "steps"]
 
                     },
                     "recipe3": {
@@ -126,12 +159,16 @@ def generate_delicious_recipes(ingredients_list):
                                 "type": "string",
                                 "description": "The short name of the recipe"
                             },
-                            "description": {
+                            "ingredients": {
+                                "type": "string",
+                                "description": "Detailed list of ingredients required for the recipe"
+                            },
+                            "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
                             }
                         },
-                        "required": ["name", "description"]
+                        "required": ["name", "ingredients", "steps"]
 
                     }
                 },
@@ -142,17 +179,19 @@ def generate_delicious_recipes(ingredients_list):
 
     # --- Step 4: Make the API call to OpenAI with function calling --- #
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Initialize the OpenAI client
+        client = OpenAI(base_url="https://api.groq.com/openai/v1",
+        api_key=os.getenv("GROQ_API_KEY")
+        )  # Initialize the groq client
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-r1-distill-llama-70b",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt_text}
             ],
             functions=functions,
             function_call={"name": "create_recipe_list"},  # Let the model create or skip function calls as it sees fit
-            max_completion_tokens=2000,
-            temperature=0.7
+            max_completion_tokens=4000,
+            temperature=0.5
 
         )
     except Exception as e:
@@ -173,15 +212,18 @@ def generate_delicious_recipes(ingredients_list):
                 # Attempt to parse the JSON arguments provided by the model
                 parsed_args = json.loads(arguments_str)
                 recipe1_name = parsed_args["recipe1"]["name"]
-                recipe1_description = parsed_args["recipe1"]["description"]
+                recipe1_ingredients = parsed_args["recipe1"]["ingredients"]
+                recipe1_steps = parsed_args["recipe1"]["steps"]
                 recipe2_name = parsed_args["recipe2"]["name"]
-                recipe2_description = parsed_args["recipe2"]["description"]
+                recipe2_ingredients = parsed_args["recipe2"]["ingredients"]
+                recipe2_steps = parsed_args["recipe2"]["steps"]
                 recipe3_name = parsed_args["recipe3"]["name"]
-                recipe3_description = parsed_args["recipe3"]["description"]
+                recipe3_ingredients = parsed_args["recipe3"]["ingredients"]
+                recipe3_steps = parsed_args["recipe3"]["steps"]
 
 
                 # list_of_recipes = [recipe1_name+'\n'+recipe1_description, recipe2_name+'\n'+recipe2_description, recipe3_name+'\n'+recipe3_description] #USE THIS ONCE FIXED
-                recipe_string = recipe1_name+'\n'+recipe1_description+'\n\n'+recipe2_name+'\n'+recipe2_description+'\n\n'+recipe3_name+'\n'+recipe3_description #TEMP FIX
+                recipe_string = recipe1_name+'\n'+recipe1_ingredients+'\n'+recipe1_steps+'\n\n'+recipe2_name+'\n'+recipe2_ingredients+'\n'+recipe2_steps+'\n\n'+recipe3_name+'\n'+recipe3_ingredients+'\n'+recipe3_steps #TEMP FIX
                 return recipe_string  # Return the structured data
 
 
@@ -190,6 +232,7 @@ def generate_delicious_recipes(ingredients_list):
 
                 return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
         else:
+            print("No function call was used")
             # If no function_call was used, fallback to raw content
             return {"fallback_content": response.choices[0].message.content.strip()}
 
@@ -199,99 +242,122 @@ def generate_delicious_recipes(ingredients_list):
 
 def extract_recipe_from_image(image_data: bytes) -> str:
     """
-    This function uses the GPT-4o model's image features to generate recipes
-    based on the content of an uploaded image.
+    This function uses OpenAI's GPT-4o model to generate a list of ingredients with their
+    estimated quantities based on the content of an uploaded image.
 
     Steps:
       1) Validate that the image data is non-empty.
-      2) Convert the bytes to a base64-encoded string (rather than creating a data URL).
+      2) Convert the bytes to a base64-encoded string.
       3) Construct a message prompt that includes both text and the base64-encoded image.
-      4) Make the API call to GPT-4o with the messages array.
-      5) Parse the output for the relevant recipe data.
+      4) Make the API call to OpenAI with function calling to get structured output.
+      5) Parse the output for the ingredients list with quantities.
       6) Return that data as a string for our API response.
 
     :param image_data: The raw bytes of the uploaded image.
-    :return: A string that describes recipe suggestions based on the image content.
+    :return: A string that lists ingredients with quantities detected in the image.
     """
 
     # --- Step 1: Basic validation of the image data --- #
-    # Here, we just check that the data is non-empty.
-    # Additional checks (e.g., verifying file headers) could be implemented as needed.
     if not image_data:
-        # Raise an error if no data was found
         raise ValueError("No image data received.")
 
     # --- Step 2: Convert image bytes to a base64-encoded string --- #
-    #    Instead of creating a data URL, we'll directly send the base64 string
-    #    in our request to the GPT-4o model.
     encoded_image = base64.b64encode(image_data).decode("utf-8")
 
-    # --- Step 3: Construct the message for GPT-4o model --- #
-    #     We'll now pass the base64-encoded image under the "image_base64" key 
-    #     instead of "image_url". This means the model receives only base64 data 
-    #     without a data URL wrapper.
-    request_messages = [
+    # --- Step 3: Define function calling structure for structured JSON output --- #
+    functions = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": (
-                        "You are a culinary computer vision expert. Please analyze this image, "
-                        "infer possible ingredients or dishes, and return a list of three creative "
-                        "recipe suggestions in JSON format as: {\"recipes\": [\"recipe1\", \"recipe2\", \"recipe3\"]}."
-                    ),
+            "name": "extract_ingredients",
+            "description": "Extract a numbered list of food ingredients with estimated quantities visible in the image",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ingredients": {
+                        "type": "array",
+                        "description": "List of ingredients with quantities detected in the image",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the ingredient"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "description": "Estimated quantity of the ingredient (e.g., '2 cups', '500g', '3 whole')"
+                                }
+                            },
+                            "required": ["name", "quantity"]
+                        }
+                    }
                 },
-                {
-                    # NOTE: We use "image_base64" instead of "image_url" to comply with 
-                    #       the requirement to pass raw base64 data instead of a URL.
-                    "type": "image_base64",
-                    "image_base64": encoded_image,
-                },
-            ],
+                "required": ["ingredients"]
+            }
         }
     ]
 
-    # --- Step 4: Make the API call to GPT-4o --- #
+    # --- Step 4: Make the API call to the GPT-4o vision model with function calling --- #
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Use the environment variable for the API key.
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Use standard OpenAI client with OpenAI API key
+
         response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=request_messages,
-            max_completion_tokens=350,  # Allows enough tokens for a meaningful response
-            temperature=0.7             # Controls the 'creativity' of the model's output
+            model="gpt-4o",  # Use OpenAI's GPT-4o model with vision capabilities
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text", 
+                            "text": "Analyze this image and identify all the food ingredients you can see. For each ingredient, try to estimate the quantity based on what's visible in the image."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{encoded_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            functions=functions,
+            function_call={"name": "extract_ingredients"},
+            max_tokens=1000,
+            temperature=0.3
         )
     except Exception as e:
-        # Catch and raise any exceptions that might occur during the API request
-        raise RuntimeError(f"OpenAI GPT-4o image analysis API call failed: {e}")
+        raise RuntimeError(f"OpenAI API call failed: {e}")
 
-    # --- Step 5: Parse the model output for recipes --- #
+    # --- Step 5: Parse the model output for ingredients with quantities --- #
     try:
-        # Extract the text response from the API
-        model_output = response.choices[0].message.content.strip()
+        # Check if the model used the function call
+        if hasattr(response.choices[0].message, "function_call"):
+            function_call_data = response.choices[0].message.function_call
+            arguments_str = function_call_data.arguments
 
-        # Attempt to parse the string as JSON
-        parsed = json.loads(model_output)
-        # Expecting {"recipes": ["...", "...", "..."]}
-        recipes_list = parsed.get("recipes", [])
+            try:
+                # Parse the JSON arguments provided by the model
+                parsed_args = json.loads(arguments_str)
+                ingredients_list = parsed_args.get("ingredients", [])
 
-        # Convert the list of recipes to a formatted string
-        # Example:
-        # 1) <recipe one>
-        # 2) <recipe two>
-        # 3) <recipe three>
-        if recipes_list:
-            recipes_str = "\n".join(
-                f"{idx + 1}) {recipe}" for idx, recipe in enumerate(recipes_list)
-            )
-            return recipes_str
+                # Format the ingredients with quantities as a numbered list
+                if ingredients_list:
+                    ingredients_str = "\n".join(
+                        f"{idx + 1}) {ingredient['name']} - {ingredient['quantity']}" 
+                        for idx, ingredient in enumerate(ingredients_list)
+                    )
+                    return ingredients_str
+                else:
+                    return "No ingredients detected in the image."
+
+            except json.JSONDecodeError:
+                return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
         else:
-            # If we have no "recipes" key or it's empty, return the raw output
-            return f"Model did not return a 'recipes' field. Full response:\n{model_output}"
+            # If no function_call was used, fallback to raw content
+            raw_content = response.choices[0].message.content.strip()
+            return f"Model did not use function call. Raw output:\n{raw_content}"
 
-    except (json.JSONDecodeError, TypeError) as e:
-        # If parsing fails, return the raw output as a fallback
-        return f"Could not parse JSON. Raw output:\n{model_output}"
+    except (IndexError, AttributeError) as e:
+        raise RuntimeError(f"Unexpected response format from API: {e}")
 
 
 def main():
@@ -301,28 +367,42 @@ def main():
       1) Defines a sample set of ingredients.
       2) Calls generate_delicious_recipes().
       3) Prints the returned recipes.
-      4) Demonstrates the placeholder to analyze an example image (for demo).
+      4) Downloads and analyzes a test image to demonstrate the image-based recipe extraction.
     """
-
+    print("Starting demo...")
     # --- Demo for text-based recipe generation --- #
     sample_ingredients = [
         ("broccoli", 2),
         ("bacon", 5),
-        ("carrot", 3)
+        ("carrot", 3),
+        ("cheese", 1),
+        ("egg", 4),
+        ("cream", 1),
+        ("pie crust", 1),
+        ("salt", 1),
+        ("pepper", 1)
     ]
     recipes_output = generate_delicious_recipes(sample_ingredients)
     print("Here are three delicious recipe suggestions from text-based function:\n")
     print(recipes_output)
 
     # --- Demo for image-based recipe extraction --- #
-    # We'll just simulate some image bytes. In practice, you'd load actual image data.
-    test_image_data = b"FakeImageBytesHere"
+    # Download a real test image from URL
     try:
+        test_image_url = "https://media.istockphoto.com/id/924476838/photo/delicious-pizza-with-ingredients-and-spices.jpg?s=612x612&w=0&k=20&c=dlj4HvyVhTavzIHyDf7fRVeXB_XDVzhlcdFx7uNi0Gw="
+        print(f"\nDownloading test image from: {test_image_url}")
+        response = requests.get(test_image_url)
+        response.raise_for_status()  # Raise exception if download fails
+        
+        # Get the image bytes from the response
+        test_image_data = response.content
+        
+        print("Image downloaded successfully, calling extract_recipe_from_image...")
         recipe_info = extract_recipe_from_image(test_image_data)
         print("\nExtracted recipe info from image:\n")
         print(recipe_info)
     except Exception as e:
-        print(f"\nError extracting recipe from image: {e}")
+        print(f"\nError in image processing: {e}")
 
 
 # This ensures main() is called only when the file is executed directly.

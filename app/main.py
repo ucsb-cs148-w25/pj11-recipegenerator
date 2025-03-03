@@ -17,6 +17,7 @@ from bson.objectid import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import login
 from pydantic import BaseModel
+import os
 
 
 # Import `get_current_user` from `login.py`
@@ -256,28 +257,51 @@ def generate_recipes():
 @app.post("/fridge/load_from_image", response_model=ImageRecipeResponse)
 async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     """
-    Accepts an image file in the request body and uses the ML function
+    Accepts an image file in the request body (JPEG, PNG, etc.) and uses the ML function
     in ML_functions.py to convert it into recipe information.
 
     Steps:
-      1) Receive the uploaded image via UploadFile.
+      1) Receive the uploaded image via UploadFile and validate its format.
       2) Read the file contents as raw bytes.
-      3) Pass the bytes to extract_recipe_from_image().
+      3) Pass the bytes to extract_recipe_from_image() which handles base64 encoding.
       4) Return a response containing the model's recipe output.
     """
-    # --- Step 1: Validate the input file --- #
+    # --- Step 1: Validate the input file and its format --- #
     if not image_file:
-        # If somehow no file was provided, we raise a 400 error
         raise HTTPException(status_code=400, detail="No image file provided.")
+    
+    # Check if the file has a valid image extension
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff'}
+    file_ext = os.path.splitext(image_file.filename)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file format. Supported formats: {', '.join(allowed_extensions)}"
+        )
+    
+    # Check content type (MIME type) for additional validation
+    content_type = image_file.content_type
+    if not content_type or not content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file does not appear to be an image."
+        )
 
     # --- Step 2: Read the file contents --- #
     try:
         file_bytes = await image_file.read()  # Read the uploaded file as bytes
+        
+        # Ensure we have actual image data
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Empty image file provided.")
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading uploaded file: {str(e)}")
 
     # --- Step 3: Call the ML function to extract recipe info --- #
     try:
+        # The extract_recipe_from_image function already handles base64 encoding internally
         recipes_from_image = extract_recipe_from_image(file_bytes)
     except ValueError as e:
         # For known validation errors, raise a 400
@@ -287,7 +311,6 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error extracting recipes from image: {str(e)}")
 
     # --- Step 4: Return the result in the ImageRecipeResponse model --- #
-    # We pass the extracted recipe info into the ImageRecipeResponse model
     return ImageRecipeResponse(recipes=recipes_from_image)
 
 
