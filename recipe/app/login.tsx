@@ -1,60 +1,71 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Alert,
+  Platform,
+} from "react-native";
 import * as GoogleAuthSession from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
-import {GoogleSignin, GoogleSigninButton } from "@react-native-google-signin/google-signin";
+import { GoogleSignin, GoogleSigninButton } from "@react-native-google-signin/google-signin";
 import { useNavigation } from "@react-navigation/native";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const webClientId =
-  "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";
+const webClientId = "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";  // from Google Console (Web type)
+const iosClientId = "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com";  // from Google Console (iOS type)
 
 export type User = {
-  token?: string;
-  serverAuthCode?: string;
+  token?: string;       // could be either idToken or accessToken
+  tokenType?: string;   // "idToken" or "accessToken"
   guest?: boolean;
   name?: string;
   email?: string;
+  userId?: string;      // your backend's unique user ID
 };
 
 interface LoginProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
-const sendUserDataToBackend = async (user: { token?: string; serverAuthCode?: string; name?: string; email?: string }) => {
+async function sendUserDataToBackend(user: User) {
   console.log("Sending user data to backend:", user);
-  console.log("User data payload (JSON):", JSON.stringify(user, null, 2));
-  
+
   try {
-    const response = await fetch("http://localhost:8000/", {
+    // Adjust your URL/port as needed; e.g., http://localhost:8000/google-login
+    const response = await fetch("http://localhost:8000/google-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Backend returned status ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Backend returned status ${response.status}`);
     }
-    
+
     const result = await response.json();
     console.log("Backend response:", result);
-    return result;
+    return result;  // e.g. { userId: "...", email: "...", or token: "..." }
   } catch (error) {
     console.error("Error sending user data to backend:", error);
     throw error;
   }
-};
+}
 
 export default function Login({ setUser }: LoginProps) {
   const navigation = useNavigation();
   const [error, setError] = useState<any>();
-  const [userInfo, setUserInfo] = useState<any>();
 
+  // For iOS/Android native config
   const configureGoogleSignin = () => {
     GoogleSignin.configure({
-      webClientId,
+      webClientId,     // optional for Android offline access
+      iosClientId,     // crucial for iOS native sign-in
       offlineAccess: true,
     });
   };
@@ -63,45 +74,53 @@ export default function Login({ setUser }: LoginProps) {
     configureGoogleSignin();
   }, []);
 
+  // ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
     console.log("Pressed native sign in");
     try {
-      console.log("Checking for Google Play Services...");
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      console.log("Google Play Services are available.");
-
       console.log("Attempting native Google sign in...");
+  
       const info = await GoogleSignin.signIn();
       console.log("Native sign in success:", info);
-
-      const result = info.data ? info.data : info;
-      if (result && result.user) {
-        const userData = {
+  
+      // If 'info.data' is present, use it; otherwise fallback to 'info'.
+      const result = info.data;
+  
+      if (result.user) {
+        // The ID token is at result.idToken (NOT info.idToken).
+        const userData: User = {
           token: result.idToken,
-          serverAuthCode: result.serverAuthCode,
+          tokenType: "idToken",
           name: result.user.name,
           email: result.user.email,
         };
-        setUserInfo(info);
+  
         setUser(userData);
-
-        await sendUserDataToBackend(userData);
+  
+        // Send to backend
+        const backendResult = await sendUserDataToBackend(userData);
+        if (backendResult.userId) {
+          userData.userId = backendResult.userId;
+          setUser(userData);
+        }
       } else {
-        console.error("No user information returned. Full info:", info);
-        Alert.alert("Sign In Error", "No user information returned from Google sign in");
+        // If we get here, there's no user object
+        console.error("No user info returned. Full info:", info);
+        Alert.alert("Sign In Error", "No user info returned from Google");
       }
-    } catch (error: any) {
-      console.error("Native sign in error:", error);
-      Alert.alert("Native sign in error", error.message || JSON.stringify(error));
-      setError(error);
+    } catch (err: any) {
+      console.error("Native sign in error:", err);
+      Alert.alert("Native sign in error", err.message || JSON.stringify(err));
+      setError(err);
     }
   };
+  
 
+  // ========== WEB SIGN-IN (Expo AuthSession) ==========
   const redirectUri = makeRedirectUri({ useProxy: true });
-  console.log("Redirect URI:", redirectUri);
-
   const [request, response, promptAsync] = GoogleAuthSession.useAuthRequest({
-    clientId: webClientId,
+    clientId: webClientId,               // from Google Cloud: Web type
     scopes: ["profile", "email"],
     redirectUri,
     extraParams: { prompt: "select_account" },
@@ -111,46 +130,68 @@ export default function Login({ setUser }: LoginProps) {
     if (response?.type === "success") {
       const { authentication } = response;
       if (authentication?.accessToken) {
+        console.log("Got access token from Expo AuthSession:", authentication.accessToken);
         fetchUserInfo(authentication.accessToken);
       }
     } else if (response?.type === "error") {
       console.error("Expo AuthSession error", response.error);
-      Alert.alert("Authentication error", response.error || "Unknown error");
+      Alert.alert("Authentication error", response.error?.message || "Unknown error");
     }
   }, [response]);
 
-  const fetchUserInfo = async (token: string) => {
+  const fetchUserInfo = async (accessToken: string) => {
     try {
+      // 1) We can fetch user profile from Google
       const res = await fetch(
-        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`
+        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
       );
       const user = await res.json();
       console.log("User info (Expo AuthSession):", user);
-      const userData = { token, name: user.name, email: user.email };
+
+      // 2) We'll create a user object with "accessToken"
+      const userData: User = {
+        token: accessToken,
+        tokenType: "accessToken",
+        name: user.name,
+        email: user.email,
+      };
       setUser(userData);
-      await sendUserDataToBackend(userData);
-    } catch (error) {
-      console.error("Failed to fetch user info", error);
+
+      // 3) Send the same data to our backend to verify + get userId
+      const result = await sendUserDataToBackend(userData);
+      if (result.userId) {
+        userData.userId = result.userId;
+        setUser(userData);
+      }
+    } catch (err) {
+      console.error("Failed to fetch user info", err);
+      Alert.alert("Fetching user info failed", err instanceof Error ? err.message : "Unknown error");
     }
   };
 
+  // For guests
   const handleGuestLogin = () => {
-    const guestUser = { guest: true, name: "Guest" };
-    setUser(guestUser);
+    setUser({ guest: true, name: "Guest" });
   };
 
+  // Decide which button to render
   const renderGoogleSignInButton = () => {
     if (Platform.OS === "web") {
+      // Web = use AuthSession
       return (
         <TouchableOpacity
           style={[styles.button, styles.googleButton]}
           onPress={() => promptAsync({ useProxy: true })}
         >
-          <Image source={require("./../assets/images/google-icon.png")} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Login with Google (AuthSession)</Text>
+          <Image
+            source={require("./../assets/images/google-icon.png")}
+            style={styles.buttonIcon}
+          />
+          <Text style={styles.buttonText}>Login with Google (Web AuthSession)</Text>
         </TouchableOpacity>
       );
     } else {
+      // iOS/Android native button
       return (
         <GoogleSigninButton
           size={GoogleSigninButton.Size.Standard}
@@ -174,6 +215,7 @@ export default function Login({ setUser }: LoginProps) {
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
