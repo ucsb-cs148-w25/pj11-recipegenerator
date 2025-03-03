@@ -89,7 +89,7 @@ class ImageRecipeResponse(BaseModel):
     Model for the response returned by the /fridge/load_from_image endpoint.
     Contains a structured list of ingredients detected in the image.
     """
-    ingredients: dict = Field(..., description="List of ingredients with quantities detected in the image")
+    ingredients: List[dict] = Field(..., description="List of ingredients with quantities detected in the image")
 
 
 # Remove or comment out the duplicate model definition that's causing conflicts
