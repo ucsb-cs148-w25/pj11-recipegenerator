@@ -232,7 +232,7 @@ def generate_suggestions(user_id: str = Depends(get_current_user)):
 def generate_recipes(user_id: str = Depends(get_current_user)):
     """
     Generate three recipe suggestions based on current fridge contents using an ML function.
-    Response is enforced by GenerateRecipesResponse.
+    Response is enforced by GenerateRecipesResponse, returning structured JSON.
     
     Raises a 400 error if the fridge is empty, or a 500 error if recipe generation fails.
     """
@@ -246,8 +246,9 @@ def generate_recipes(user_id: str = Depends(get_current_user)):
             detail="The fridge is empty! Please add some ingredients first."
         )
     try:
-        recipe_text = generate_delicious_recipes(fridge_contents)
-        return GenerateRecipesResponse(recipes=recipe_text)
+        # This function now needs to return a dictionary with recipe1, recipe2, recipe3 keys
+        recipes_dict = generate_delicious_recipes(fridge_contents)
+        return recipes_dict
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -258,13 +259,9 @@ def generate_recipes(user_id: str = Depends(get_current_user)):
 async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     """
     Accepts an image file in the request body (JPEG, PNG, etc.) and uses the ML function
-    in ML_functions.py to convert it into recipe information.
+    to convert it into structured recipe information.
 
-    Steps:
-      1) Receive the uploaded image via UploadFile and validate its format.
-      2) Read the file contents as raw bytes.
-      3) Pass the bytes to extract_recipe_from_image() which handles base64 encoding.
-      4) Return a response containing the model's recipe output.
+    Returns a JSON response with a list of ingredients detected in the image.
     """
     # --- Step 1: Validate the input file and its format --- #
     if not image_file:
@@ -301,14 +298,12 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
 
     # --- Step 3: Call the ML function to extract recipe info --- #
     try:
-        # The extract_recipe_from_image function already handles base64 encoding internally
-        recipes_from_image = extract_recipe_from_image(file_bytes)
+        # The extract_recipe_from_image function now returns a dictionary with an ingredients list
+        ingredients_dict = extract_recipe_from_image(file_bytes)
+        return ingredients_dict
     except ValueError as e:
         # For known validation errors, raise a 400
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # General fallback for unexpected errors
         raise HTTPException(status_code=500, detail=f"Error extracting recipes from image: {str(e)}")
-
-    # --- Step 4: Return the result in the ImageRecipeResponse model --- #
-    return ImageRecipeResponse(recipes=recipes_from_image)
