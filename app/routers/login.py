@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Security, HTTPException
+from fastapi import FastAPI, Security, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -6,22 +6,12 @@ from pydantic import BaseModel
 import httpx
 from datetime import datetime, timedelta, timezone
 import jwt
-from datetime import datetime, timedelta
 
-app = FastAPI()
+router = APIRouter()
 
 # OAuth2 scheme (used in main.py)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Allow requests from anywhere (development convenience).
-# In production, configure this carefully or set a specific domain.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Secret key for signing your JWT
 # Replace with a secure, random value in production (from an .env file, etc.)
@@ -32,13 +22,47 @@ ALGORITHM = "HS256"
 class GoogleLoginPayload(BaseModel):
     accessToken: str
 
-@app.post("/google-login")
+TEST_USERS = {
+    "testuser1": {"password": "password1", "user_id": "user_id_001", "name": "User One"},
+    "testuser2": {"password": "password2", "user_id": "user_id_002", "name": "User Two"},
+    "testuser3": {"password": "password3", "user_id": "user_id_003", "name": "User Three"}
+}
+
+def generate_jwt_token(user_id: str, name: str) -> str:
+    payload = {
+        "sub": user_id,
+        "name": name,
+        "exp": datetime.utcnow() + timedelta(hours = 1)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@router.post("/login")
+def login(request: LoginRequest):
+    """
+    Accepts username & password in JSON format.
+    """
+    user = TEST_USERS.get(request.username)
+    
+    if user and request.password == user["password"]:
+        token = generate_jwt_token(user_id=user["user_id"], name=user["name"])
+        return {"access_token": token, "token_type": "bearer"}
+    
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@router.post("/google-login")
 async def google_login(payload: GoogleLoginPayload):
     """
     Input: the user's Google access token from the frontend.
     Output: JSONResponse containing a custom JWT token for the user 
             if success, or a error if user is invalid or expired.
     """
+
+    
 
     # Verify token with Google
     user_info = await verify_google_access_token(payload.accessToken)

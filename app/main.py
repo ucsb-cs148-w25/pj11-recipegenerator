@@ -14,6 +14,10 @@ from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import login
+from pydantic import BaseModel
+
 
 # Import `get_current_user` from `login.py`
 from app.routers.login import get_current_user
@@ -33,6 +37,10 @@ from app.models import (
     ImageRecipeResponse
 )
 
+class Item(BaseModel):
+    name: str
+    quantity: int 
+
 # MongoDB URI
 # uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
 uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
@@ -41,6 +49,10 @@ client = MongoClient(uri, server_api=ServerApi('1'))
 # Connect to the database and collection
 db = client["fridge"]
 fridge_items = db["fridge_items"]
+
+# Secret Key
+SECRET_KEY = "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"
+ALGORITHM = "HS256"
 
 # -----------------------------------------------------------------------------
 # 1) Configure the FastAPI instance so that docs_url="/" serves the Swagger UI.
@@ -51,6 +63,19 @@ app = FastAPI(
     openapi_url="/openapi.json",  # Keep the OpenAPI specification accessible
     redoc_url="/redoc"            # Keep or remove ReDoc by setting it to None
 )
+
+# Allow requests from anywhere (development convenience).
+# In production, configure this carefully or set a specific domain.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.include_router(login.router)
 
 def unpack_item(item: dict) -> FridgeItem:
     """
@@ -97,27 +122,50 @@ def get_items(user_id: str = Depends(get_current_user)):
     # Convert each MongoDB document into a FridgeItem using unpack_item
     return [unpack_item(item) for item in items_cursor]
 
+# @app.post("/fridge/add", response_model=AddItemResponse)
+# def add_item(item: Item, user_id: str = Depends(get_current_user)):
+#     """
+#     Add an item to the fridge. The request body is validated by Item. 
+#     Response is enforced by AddItemResponse.
+    
+#     Steps:
+#       1) If the item already exists, increment its quantity.
+#       2) Otherwise, create a new document with the given name/quantity.
+#       3) Retrieve all items afterward and return them in the response.
+#     """
+#     # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
+#     fridge_items.update_one(
+#         {"user_id": user_id, "name": item.name},
+#         {"$inc": {"quantity": item.quantity}},
+#         upsert=True
+#     )
+#     # Get the updated list of items in the fridge
+#     all_items_fridge = get_items(item.user_id)  # This will return a list[FridgeItem]
+    
+#     # Return a response that includes a short message and the updated item list
+#     return AddItemResponse(
+#         message=f"{item.quantity} {item.name}(s) added to the fridge.",
+#         all_items=all_items_fridge
+#     )
+
 @app.post("/fridge/add", response_model=AddItemResponse)
 def add_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Add an item to the fridge. The request body is validated by Item. 
     Response is enforced by AddItemResponse.
-    
-    Steps:
-      1) If the item already exists, increment its quantity.
-      2) Otherwise, create a new document with the given name/quantity.
-      3) Retrieve all items afterward and return them in the response.
     """
-    # Attempt to increment the quantity if the item name exists. Otherwise upsert a new record.
+    # Upsert the item in the database using `user_id` from JWT
     fridge_items.update_one(
         {"user_id": user_id, "name": item.name},
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
-    # Get the updated list of items in the fridge
-    all_items_fridge = get_items(item.user_id)  # This will return a list[FridgeItem]
+
+    print(f"Authenticated user: {user_id}")
     
-    # Return a response that includes a short message and the updated item list
+    # Get the updated list of items
+    all_items_fridge = get_items(user_id)
+    
     return AddItemResponse(
         message=f"{item.quantity} {item.name}(s) added to the fridge.",
         all_items=all_items_fridge
@@ -134,7 +182,7 @@ def remove_item(item: Item, user_id: str = Depends(get_current_user)):
       2) Check that the fridge contains enough quantity.
       3) Subtract the item quantity or remove the document if it goes to zero.
     """
-    existing_item = fridge_items.find_one({"user_id": item.user_id, "name": item.name})
+    existing_item = fridge_items.find_one({"user_id": user_id, "name": item.name})
 
     if not existing_item:
         # If the item doesn't exist, raise a 404 error
@@ -151,7 +199,7 @@ def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     else:
         fridge_items.delete_one({"user_id": user_id, "name": item.name})
     
-    all_items_fridge = get_items(item.user_id)
+    all_items_fridge = get_items(user_id)
     # Return a confirmation message
     return RemoveItemResponse(
         message=f"{item.quantity} {item.name}(s) removed from the fridge.",
