@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
+import { apiRequest } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 export default function FridgePage() {
   const [items, setItems] = useState([]);
@@ -13,8 +16,15 @@ export default function FridgePage() {
 
   const fetchItems = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/get");
-      const data = await response.json();
+      const userId = await AsyncStorage.getItem("userId");
+      if (!userId) {
+        console.log("No user logged in.");
+        return;
+      }
+  
+      const data = await apiRequest(`/fridge/${userId}/get`);
+      console.log("User-specific fridge items:", data);
+  
       if (Array.isArray(data)) {
         setItems(data);
       } else {
@@ -42,6 +52,7 @@ export default function FridgePage() {
     } catch (error) {
       console.error("Error adding item:", error);
     }
+
   };
 
   const updateQuantity = async (itemName) => {
