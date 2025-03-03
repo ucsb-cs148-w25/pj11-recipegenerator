@@ -23,6 +23,10 @@ import json
 import openai
 import requests  # Added import for fetching image from URL
 from openai import OpenAI
+from dotenv import load_dotenv  # Add this import for loading .env file
+
+# Load environment variables from .env file
+load_dotenv()  # This will load all variables from .env into os.environ
 
 def generate_delicious_recipes(ingredients_list):
 
@@ -211,25 +215,28 @@ def generate_delicious_recipes(ingredients_list):
             try:
                 # Attempt to parse the JSON arguments provided by the model
                 parsed_args = json.loads(arguments_str)
-                recipe1_name = parsed_args["recipe1"]["name"]
-                recipe1_ingredients = parsed_args["recipe1"]["ingredients"]
-                recipe1_steps = parsed_args["recipe1"]["steps"]
-                recipe2_name = parsed_args["recipe2"]["name"]
-                recipe2_ingredients = parsed_args["recipe2"]["ingredients"]
-                recipe2_steps = parsed_args["recipe2"]["steps"]
-                recipe3_name = parsed_args["recipe3"]["name"]
-                recipe3_ingredients = parsed_args["recipe3"]["ingredients"]
-                recipe3_steps = parsed_args["recipe3"]["steps"]
-
-
-                # list_of_recipes = [recipe1_name+'\n'+recipe1_description, recipe2_name+'\n'+recipe2_description, recipe3_name+'\n'+recipe3_description] #USE THIS ONCE FIXED
-                recipe_string = recipe1_name+'\n'+recipe1_ingredients+'\n'+recipe1_steps+'\n\n'+recipe2_name+'\n'+recipe2_ingredients+'\n'+recipe2_steps+'\n\n'+recipe3_name+'\n'+recipe3_ingredients+'\n'+recipe3_steps #TEMP FIX
-                return recipe_string  # Return the structured data
-
+                
+                # Return the structured data directly as a dictionary matching our response model
+                return {
+                    "recipe1": {
+                        "name": parsed_args["recipe1"]["name"],
+                        "ingredients": parsed_args["recipe1"]["ingredients"],
+                        "steps": parsed_args["recipe1"]["steps"]
+                    },
+                    "recipe2": {
+                        "name": parsed_args["recipe2"]["name"],
+                        "ingredients": parsed_args["recipe2"]["ingredients"],
+                        "steps": parsed_args["recipe2"]["steps"]
+                    },
+                    "recipe3": {
+                        "name": parsed_args["recipe3"]["name"],
+                        "ingredients": parsed_args["recipe3"]["ingredients"],
+                        "steps": parsed_args["recipe3"]["steps"]
+                    }
+                }
 
             except json.JSONDecodeError:
                 # If the model messed up, return the raw arguments
-
                 return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
         else:
             print("No function call was used")
@@ -240,7 +247,7 @@ def generate_delicious_recipes(ingredients_list):
         raise RuntimeError(f"Unexpected response format from OpenAI API: {e}")
 
 
-def extract_recipe_from_image(image_data: bytes) -> str:
+def extract_recipe_from_image(image_data: bytes) -> dict:
     """
     This function uses OpenAI's GPT-4o model to generate a list of ingredients with their
     estimated quantities based on the content of an uploaded image.
@@ -251,10 +258,10 @@ def extract_recipe_from_image(image_data: bytes) -> str:
       3) Construct a message prompt that includes both text and the base64-encoded image.
       4) Make the API call to OpenAI with function calling to get structured output.
       5) Parse the output for the ingredients list with quantities.
-      6) Return that data as a string for our API response.
+      6) Return that data as a structured JSON dictionary for our API response.
 
     :param image_data: The raw bytes of the uploaded image.
-    :return: A string that lists ingredients with quantities detected in the image.
+    :return: A dictionary containing ingredients with quantities detected in the image.
     """
 
     # --- Step 1: Basic validation of the image data --- #
@@ -339,22 +346,17 @@ def extract_recipe_from_image(image_data: bytes) -> str:
                 parsed_args = json.loads(arguments_str)
                 ingredients_list = parsed_args.get("ingredients", [])
 
-                # Format the ingredients with quantities as a numbered list
-                if ingredients_list:
-                    ingredients_str = "\n".join(
-                        f"{idx + 1}) {ingredient['name']} - {ingredient['quantity']}" 
-                        for idx, ingredient in enumerate(ingredients_list)
-                    )
-                    return ingredients_str
-                else:
-                    return "No ingredients detected in the image."
+                # Return the structured data directly as a dictionary matching our response model
+                return {
+                    "ingredients": ingredients_list  # This already has the right structure with name and quantity keys
+                }
 
             except json.JSONDecodeError:
                 return {"error": "Failed to parse function call arguments", "raw_arguments": arguments_str}
         else:
             # If no function_call was used, fallback to raw content
             raw_content = response.choices[0].message.content.strip()
-            return f"Model did not use function call. Raw output:\n{raw_content}"
+            return {"fallback_content": raw_content}
 
     except (IndexError, AttributeError) as e:
         raise RuntimeError(f"Unexpected response format from API: {e}")
@@ -384,7 +386,7 @@ def main():
     ]
     recipes_output = generate_delicious_recipes(sample_ingredients)
     print("Here are three delicious recipe suggestions from text-based function:\n")
-    print(recipes_output)
+    print(json.dumps(recipes_output, indent=4))
 
     # --- Demo for image-based recipe extraction --- #
     # Download a real test image from URL
@@ -400,7 +402,7 @@ def main():
         print("Image downloaded successfully, calling extract_recipe_from_image...")
         recipe_info = extract_recipe_from_image(test_image_data)
         print("\nExtracted recipe info from image:\n")
-        print(recipe_info)
+        print(json.dumps(recipe_info, indent=4))
     except Exception as e:
         print(f"\nError in image processing: {e}")
 
