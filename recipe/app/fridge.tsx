@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
 import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
-import { apiRequest } from "./api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 
 export default function FridgePage() {
   const [items, setItems] = useState([]);
@@ -16,15 +13,8 @@ export default function FridgePage() {
 
   const fetchItems = async () => {
     try {
-      const userId = await AsyncStorage.getItem("userId");
-      if (!userId) {
-        console.log("No user logged in.");
-        return;
-      }
-  
-      const data = await apiRequest(`/fridge/${userId}/get`);
-      console.log("User-specific fridge items:", data);
-  
+      const response = await fetch("http://127.0.0.1:8000/fridge/get");
+      const data = await response.json();
       if (Array.isArray(data)) {
         setItems(data);
       } else {
@@ -52,7 +42,6 @@ export default function FridgePage() {
     } catch (error) {
       console.error("Error adding item:", error);
     }
-
   };
 
   const updateQuantity = async (itemName) => {
@@ -93,10 +82,12 @@ export default function FridgePage() {
   const decrementQuantity = async (itemName, currentQuantity) => {
     try {
       if (currentQuantity > 1) {
-        const response = await fetch("http://127.0.0.1:8000/fridge/remove", {
+        const newQuantity = currentQuantity - 1; // Calculate new quantity
+  
+        const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: itemName, quantity: 1 }), // Decrement by 1
+          body: JSON.stringify({ name: itemName, quantity: newQuantity }),
         });
   
         if (!response.ok) {
@@ -104,7 +95,12 @@ export default function FridgePage() {
           throw new Error(`Error ${response.status}: ${errorText}`);
         }
   
-        fetchItems(); // 🔹 Ensure we fetch the updated list
+        setEditingQuantity((prev) => ({
+          ...prev,
+          [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+        }));
+  
+        fetchItems(); // Refresh the item list
       } else {
         removeItemCompletely(itemName); // If last item, remove it entirely
       }
@@ -112,6 +108,7 @@ export default function FridgePage() {
       console.error("Error decrementing item:", error);
     }
   };
+  
 
   
   const incrementQuantity = async (itemName, currentQuantity) => {
