@@ -16,7 +16,7 @@
 ## Continue
 - Communicating through Slack and discord
 - Working on frontend development
-- Adding stuff to the database
+- Adding bathrooms to the database
 - Brainstorming potential features and improvements
 
 ## Action Item
@@ -27,7 +27,7 @@
 **Measurement:** Achieve a shared understanding within the team regarding completed tasks and pending issues for the week
 
 ## Retro Assessment
-We used the Start/Stop/Continue process, which proved effective in providing clarity on team progress and individual contributions. The experiment improved our communication and increased awareness of task completion and pending work. While the process is currently beneficial, it may become repetitive if issue volume decreases. Future adjustments may be needed based on evolving project requirements.
+We used the Start/Stop/Continue process, which proved effective in providing clarity on team progress and individual contributions. The experiment improved our communication through Messenger and increased awareness of task completion and pending work. While the process is currently beneficial, it may become repetitive if issue volume decreases. Future adjustments may be needed based on evolving project requirements.
 
 ## Experiment Outcome
 The daily check-ins on discord improved transparency and accountability within the team. Team members were more aware of ongoing tasks and blockers, which led to more efficient collaboration. However, participation in daily check-ins varied, and some members needed reminders to update the Kanban board consistently. Moving forward, we will refine the process by setting designated check-in times and reinforcing the importance of updates. The team has decided to keep the check-ins but reduce the frequency to three times a week to maintain engagement without redundancy.

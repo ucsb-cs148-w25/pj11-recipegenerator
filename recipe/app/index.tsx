@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 
 export default function Homepage() {
   const [savedRecipes, setSavedRecipes] = useState([]);
@@ -17,7 +17,7 @@ export default function Homepage() {
       }
 
       const data = await response.json();
-      setSavedRecipes(data);
+      setSavedRecipes(data); // Expecting a list of saved recipes
     } catch (error) {
       console.error("Error fetching saved recipes:", error);
     } finally {
@@ -25,29 +25,12 @@ export default function Homepage() {
     }
   };
 
-  const removeFavorite = async (title) => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/remove_favorite_recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-  
-      if (!response.ok) {
-        throw new Error("Failed to remove favorite recipe.");
-      }
-  
-      setSavedRecipes((prevRecipes) => prevRecipes.filter((recipe) => recipe.title !== title)); // 🔥 Remove instantly
-    } catch (error) {
-      console.error("Error removing favorite recipe:", error);
-    }
-  };
-  
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Saved Recipes</Text>
-      <Text style={styles.subtitle}>Your favorited recipes are stored here.</Text>
+      <Text style={styles.subtitle}>
+        Your favorited recipes are stored here.
+      </Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#088F8F" />
@@ -55,16 +38,14 @@ export default function Homepage() {
         <ScrollView style={styles.historyContainer}>
           {savedRecipes.map((recipe) => (
             <View key={recipe.id} style={styles.recipeCard}>
-              <View style={styles.header}>
-                <Text style={styles.recipeName}>{recipe.title}</Text>
-                <TouchableOpacity onPress={() => removeFavorite(recipe.title)}>
-                  <Image
-                    source={require("../assets/images/favorited.png")}
-                    style={styles.favoriteIcon}
-                  />
-                </TouchableOpacity>
+              <Text style={styles.recipeName}>{recipe.title}</Text>
+              <View style={styles.statsContainer}>
+                <Text style={styles.statText}>Last Cooked: {recipe.lastCooked || "N/A"}</Text>
+                <Text style={styles.statText}>Times Cooked: {recipe.timesCooked || 1}</Text>
+                <Text style={styles.statText}>Rating: {recipe.rating || "No rating"}/5</Text>
               </View>
-              <Text style={styles.notes}>{recipe.description || "No description available."}</Text>
+              <Text style={styles.notesTitle}>Notes:</Text>
+              <Text style={styles.notes}>{recipe.notes || "No notes added."}</Text>
             </View>
           ))}
         </ScrollView>
@@ -76,10 +57,6 @@ export default function Homepage() {
 }
 
 const styles = StyleSheet.create({
-  favoriteIcon: {
-    width: 24,
-    height: 24,
-  },
   container: { 
     flex: 1, 
     padding: 20,

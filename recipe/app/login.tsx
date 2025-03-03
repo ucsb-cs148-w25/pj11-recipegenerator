@@ -27,24 +27,24 @@ const sendUserDataToBackend = async (user: { token?: string; serverAuthCode?: st
   console.log("Sending user data to backend:", user);
   console.log("User data payload (JSON):", JSON.stringify(user, null, 2));
   
-  // try {
-  //   const response = await fetch("http://localhost:8000/", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify(user),
-  //   });
+  try {
+    const response = await fetch("http://localhost:8000/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
     
-  //   if (!response.ok) {
-  //     throw new Error(`Backend returned status ${response.status}`);
-  //   }
+    if (!response.ok) {
+      throw new Error(`Backend returned status ${response.status}`);
+    }
     
-  //   const result = await response.json();
-  //   console.log("Backend response:", result);
-  //   return result;
-  // } catch (error) {
-  //   console.error("Error sending user data to backend:", error);
-  //   throw error;
-  // }
+    const result = await response.json();
+    console.log("Backend response:", result);
+    return result;
+  } catch (error) {
+    console.error("Error sending user data to backend:", error);
+    throw error;
+  }
 };
 
 export default function Login({ setUser }: LoginProps) {
@@ -55,7 +55,6 @@ export default function Login({ setUser }: LoginProps) {
   const configureGoogleSignin = () => {
     GoogleSignin.configure({
       webClientId,
-      iosClientId: "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com",
       offlineAccess: true,
     });
   };

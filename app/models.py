@@ -8,61 +8,63 @@ easy to understand and maintain.
 from pydantic import BaseModel, Field
 from typing import List
 
-class FavoriteRecipe(BaseModel):
-    title: str
-    description: str
-    isFavorited: bool  # Indicates if the recipe is favorited
-
-class RemoveFavoriteRequest(BaseModel):
-    title: str  # Only expecting title when removing
-    
-class FridgeItem(BaseModel):
-    """
-    Model for an item as stored in the fridge, including the unique identifier
-    assigned by MongoDB, the name, and the quantity.
-    """
-    id: str = Field(..., description="Unique identifier for this item.")
-    name: str = Field(..., description="Name of the item.")
-    quantity: int = Field(..., description="Quantity of the item in the fridge.")
-
-class UpdateItemResponse(BaseModel):
-    """
-    Model for the response returned by the /fridge/update_quantity endpoint.
-    Contains a message and a list of all updated items.
-    """
-    message: str
-    all_items: List[FridgeItem]  # Ensuring FridgeItem is properly referenced
-
 class OpeningPageResponse(BaseModel):
     """
     Model for the response returned by the root endpoint '/'.
     This response simply contains a welcome message for the user.
     """
+    # A string field representing a human-readable message about the app
     Message: str = Field(..., description="Welcome message from the app.")
+
 
 class Item(BaseModel):
     """
     Model for the request body used by the add_item and remove_item endpoints.
     This model validates that the user provides a string 'name' and an integer 'quantity'.
     """
+    # The user owning this item
+    user_id: str = Field(..., description = "user_id")
+    # The name of the item to be added or removed
     name: str = Field(..., description="Name of the item.")
+    # The quantity of the item to be added or removed
     quantity: int = Field(..., gt=0, description="Quantity of the item (must be greater than 0).")
+
+
+class FridgeItem(BaseModel):
+    """
+    Model for an item as stored in the fridge, including the unique identifier
+    assigned by MongoDB, the name, and the quantity.
+    """
+    # A string representing the unique identifier (ObjectId) of the item in the database
+    id: str = Field(..., description="Unique identifier for this item.")
+    # Added: a string representing the unique identifier of the user using this database.
+    user_id: str = Field(..., description = "Unique identifier for user.")
+    # The name of the item as stored in the fridge
+    name: str = Field(..., description="Name of the item.")
+    # The current quantity of the item
+    quantity: int = Field(..., description="Quantity of the item in the fridge.")
+
 
 class AddItemResponse(BaseModel):
     """
     Model for the response returned by the /fridge/add endpoint.
     Contains a message string and a list of all items currently in the fridge.
     """
+    # A string containing a short message about the added item
     message: str = Field(..., description="Confirmation message indicating successful item addition.")
+    # A list of all items currently in the fridge after the addition
     all_items: List[FridgeItem] = Field(..., description="Complete list of items in the fridge.")
+
 
 class RemoveItemResponse(BaseModel):
     """
     Model for the response returned by the /fridge/remove endpoint.
     Contains a simple message referencing the item removal result.
     """
+    # A string containing a short message about the removed item
     message: str = Field(..., description="Confirmation message indicating successful item removal.")
-    all_items: List[FridgeItem]  # Ensuring updated fridge list is returned
+        # A list of all items currently in the fridge after the remove
+    all_items: List[FridgeItem] = Field(..., description="Complete list of items in the fridge.")
 
 
 class GenerateSuggestionsResponse(BaseModel):
