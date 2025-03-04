@@ -83,17 +83,6 @@ def generate_delicious_recipes(ingredients_list):
         "It is not mandatory to use all ingredients. For each recipe, give a short name, the ingredients required (should only include ingredients that the user has in their freezer) and a detailed, step by step recipe.\n\n"
         """Here is an example recipe:\n"
 "Broccoli Bacon Quiche\n\n"
-"Ingredients:\n"
-"- 4 strips of bacon, chopped into small pieces\n"
-"- 1 medium broccoli head (about 2 cups when chopped)\n"
-"- 1/2 cup grated cheddar cheese\n"
-"- 1/4 cup grated parmesan cheese\n"
-"- 4 large eggs\n"
-"- 1 cup heavy cream\n"
-"- 1 pre-made pie crust (9-inch)\n"
-"- 1/2 teaspoon salt\n"
-"- 1/4 teaspoon black pepper\n"
-"- 1/8 teaspoon nutmeg\n\n"
 "Instructions:\n"
 "1. Preheat the oven to 375°F (190°C) - 5 minutes\n"
 "2. Cook the chopped bacon in a skillet over medium heat until crispy (about 8-10 minutes). Remove with a slotted spoon and drain on paper towels.\n"
@@ -104,6 +93,17 @@ def generate_delicious_recipes(ingredients_list):
 "7. Pour the egg mixture over the filling ingredients.\n"
 "8. Bake in the preheated oven for 35-40 minutes, until the center is set and the top is golden brown.\n"
 "9. Let cool for 10 minutes before slicing and serving.\n\n"
+"Ingredients:\n"
+"4 strips of bacon, chopped into small pieces,"
+"1 medium broccoli head (about 2 cups when chopped),"
+"1/2 cup grated cheddar cheese, "
+"1/4 cup grated parmesan cheese, "
+"4 large eggs, "
+"1 cup heavy cream, "
+"1 pre-made pie crust (9-inch), "
+"1/2 teaspoon salt, "
+"1/4 teaspoon black pepper, "
+"1/8 teaspoon nutmeg\n\n"
 "Please follow this example format with detailed measurements, precise timing for each step, and complete instructions for your three recipe suggestions, but in a function calling format instead."""
     )
 
@@ -130,7 +130,7 @@ def generate_delicious_recipes(ingredients_list):
                             "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
-                            }
+                            },
                         },
                         "required": ["name", "ingredients", "steps"]
 
@@ -150,7 +150,7 @@ def generate_delicious_recipes(ingredients_list):
                             "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
-                            }
+                            },
                         },
                         "required": ["name", "ingredients", "steps"]
 
@@ -170,7 +170,7 @@ def generate_delicious_recipes(ingredients_list):
                             "steps": {
                                 "type": "string",
                                 "description": "Detailed, step by step recipe"
-                            }
+                            },
                         },
                         "required": ["name", "ingredients", "steps"]
 
@@ -220,17 +220,17 @@ def generate_delicious_recipes(ingredients_list):
                 return {
                     "recipe1": {
                         "name": parsed_args["recipe1"]["name"],
-                        "ingredients": parsed_args["recipe1"]["ingredients"],
+                        "ingredients": parsed_args["recipe1"]["ingredients"].split(", "),
                         "steps": parsed_args["recipe1"]["steps"]
                     },
                     "recipe2": {
                         "name": parsed_args["recipe2"]["name"],
-                        "ingredients": parsed_args["recipe2"]["ingredients"],
+                        "ingredients": parsed_args["recipe2"]["ingredients"].split(", "),
                         "steps": parsed_args["recipe2"]["steps"]
                     },
                     "recipe3": {
                         "name": parsed_args["recipe3"]["name"],
-                        "ingredients": parsed_args["recipe3"]["ingredients"],
+                        "ingredients": parsed_args["recipe3"]["ingredients"].split(", "),
                         "steps": parsed_args["recipe3"]["steps"]
                     }
                 }
