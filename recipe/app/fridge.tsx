@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
-import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image, FlatList, TextInput,Alert} from "react-native";
+
+import * as ImagePicker from "expo-image-picker";
 import { apiRequest } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -8,6 +10,7 @@ export default function FridgePage() {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [editingQuantity, setEditingQuantity] = useState({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -15,7 +18,6 @@ export default function FridgePage() {
 
   const fetchItems = async () => {
     try {
-      // Call the endpoint without a user ID in the URL.
       const data = await apiRequest("/fridge/get");
       console.log("User-specific fridge items:", data);
       if (Array.isArray(data)) {
@@ -29,13 +31,14 @@ export default function FridgePage() {
     }
   };
 
-  const addItem = async () => {
-    if (!name || !quantity) return;
+  const addItem = async (ingredient) => {
+    // ingredient should be an object with name and quantity
     try {
-      const data = await apiRequest("/fridge/add", "POST", { name, quantity: parseInt(quantity) });
+      const data = await apiRequest("/fridge/add", "POST", {
+        name: ingredient.name,
+        quantity: parseInt(ingredient.quantity),
+      });
       setItems(data.all_items);
-      setName("");
-      setQuantity("");
       fetchItems();
     } catch (error) {
       console.error("Error adding item:", error);
@@ -47,7 +50,10 @@ export default function FridgePage() {
     const newQuantity = editingQuantity[itemName];
     if (newQuantity === "") return;
     try {
-      const data = await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: parseInt(newQuantity) || 0 });
+      const data = await apiRequest("/fridge/update_quantity", "POST", {
+        name: itemName,
+        quantity: parseInt(newQuantity) || 0,
+      });
       setItems(data.all_items);
       fetchItems();
     } catch (error) {
@@ -57,7 +63,10 @@ export default function FridgePage() {
 
   const removeItemCompletely = async (itemName) => {
     try {
-      await apiRequest("/fridge/remove", "POST", { name: itemName, quantity: 1000000000 });
+      await apiRequest("/fridge/remove", "POST", {
+        name: itemName,
+        quantity: 1000000000,
+      });
       fetchItems();
     } catch (error) {
       console.error("Error removing item completely:", error);
@@ -68,7 +77,10 @@ export default function FridgePage() {
     try {
       if (currentQuantity > 1) {
         const newQuantity = currentQuantity - 1;
-        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
+        await apiRequest("/fridge/update_quantity", "POST", {
+          name: itemName,
+          quantity: newQuantity,
+        });
         setEditingQuantity((prev) => ({
           ...prev,
           [itemName]: String(newQuantity),
@@ -85,7 +97,10 @@ export default function FridgePage() {
   const incrementQuantity = async (itemName, currentQuantity) => {
     try {
       const newQuantity = currentQuantity + 1;
-      await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
+      await apiRequest("/fridge/update_quantity", "POST", {
+        name: itemName,
+        quantity: newQuantity,
+      });
       setEditingQuantity((prev) => ({
         ...prev,
         [itemName]: String(newQuantity),
@@ -95,6 +110,94 @@ export default function FridgePage() {
       console.error("Error incrementing quantity:", error);
     }
   };
+
+  // ---------- New: Upload Image and Add Ingredients ----------
+
+  const pickImage = async () => {
+    // Request permission first
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission required", "Permission to access camera roll is required!");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+    if (!result.cancelled) {
+      uploadImage(result.uri);
+    }
+  };
+
+  const uploadImage = async (uri) => {
+  try {
+    setLoading(true);
+    // Extract the file name from the URI
+    const uriParts = uri.split('/');
+    const fileName = uriParts[uriParts.length - 1] || "image.jpg";
+    // Determine the file type from the extension (you can add more types as needed)
+    const match = /\.(\w+)$/.exec(fileName);
+    const type = match ? `image/${match[1]}` : `image`;
+
+    // Prepare a FormData object since the endpoint expects multipart/form-data.
+    const formData = new FormData();
+    formData.append("image_file", {
+      uri,
+      name: fileName,
+      type,
+    });
+
+    // Do not manually set Content-Type; let fetch set it automatically.
+    const token = await AsyncStorage.getItem("token");
+    const headers = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const response = await fetch(`http://localhost:8000/fridge/load_from_image`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Image to ingredients response:", data);
+    // Ask user if they want to add these ingredients to the fridge.
+    Alert.alert(
+      "Add Ingredients?",
+      "Do you want to add the detected ingredients to your fridge?",
+      [
+        {
+          text: "No",
+          style: "cancel",
+        },
+        {
+          text: "Yes",
+          onPress: () => {
+            if (data.ingredients && Array.isArray(data.ingredients)) {
+              data.ingredients.forEach((ingredient) => {
+                addItem(ingredient);
+              });
+            } else {
+              Alert.alert("Error", "No ingredients detected.");
+            }
+          },
+        },
+      ]
+    );
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    Alert.alert("Error", "Failed to process image. Please try again later.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  // -----------------------------------------------------------
 
   return (
     <ScrollView style={styles.container}>
@@ -146,6 +249,12 @@ export default function FridgePage() {
         />
         <TouchableOpacity style={styles.addButton} onPress={addItem}>
           <Image source={require("./../assets/images/add3.png")} />
+        </TouchableOpacity>
+      </View>
+      {/* New Upload Image Button */}
+      <View style={styles.uploadSection}>
+        <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+          <Text style={styles.uploadButtonText}>Upload Fridge Image</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -216,11 +325,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   input: { 
+    flex: 1,
     borderWidth: 1,
     borderColor: "#088F8F",
-    padding: 10,
     marginVertical: 10,
     borderRadius: 5,
     backgroundColor: "white",
+    padding: 10,
+  },
+  uploadSection: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  uploadButton: {
+    backgroundColor: "#088F8F",
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  uploadButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: 1,
   },
 });
