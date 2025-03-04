@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+} from "react-native";
+import { apiRequest } from "./api";
 
 export default function Homepage() {
   const [savedRecipes, setSavedRecipes] = useState([]);
@@ -11,12 +20,7 @@ export default function Homepage() {
 
   const fetchSavedRecipes = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/get_favorite_recipes");
-      if (!response.ok) {
-        throw new Error("Failed to fetch saved recipes.");
-      }
-
-      const data = await response.json();
+      const data = await apiRequest("/fridge/get_favorite_recipes");
       setSavedRecipes(data);
     } catch (error) {
       console.error("Error fetching saved recipes:", error);
@@ -27,27 +31,22 @@ export default function Homepage() {
 
   const removeFavorite = async (title) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/remove_favorite_recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-  
-      if (!response.ok) {
-        throw new Error("Failed to remove favorite recipe.");
-      }
-  
-      setSavedRecipes((prevRecipes) => prevRecipes.filter((recipe) => recipe.title !== title)); // 🔥 Remove instantly
+      await apiRequest("/fridge/remove_favorite_recipe", "POST", { title });
+      // Remove instantly from the UI.
+      setSavedRecipes((prevRecipes) =>
+        prevRecipes.filter((recipe) => recipe.title !== title)
+      );
     } catch (error) {
       console.error("Error removing favorite recipe:", error);
     }
   };
-  
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Saved Recipes</Text>
-      <Text style={styles.subtitle}>Your favorited recipes are stored here.</Text>
+      <Text style={styles.subtitle}>
+        Your favorited recipes are stored here.
+      </Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#088F8F" />
@@ -64,7 +63,9 @@ export default function Homepage() {
                   />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.notes}>{recipe.description || "No description available."}</Text>
+              <Text style={styles.notes}>
+                {recipe.description || "No description available."}
+              </Text>
             </View>
           ))}
         </ScrollView>
@@ -112,28 +113,15 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   recipeName: {
     fontSize: 20,
     fontWeight: "600",
     color: "#088F8F",
     marginBottom: 10,
-  },
-  statsContainer: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-  },
-  statText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 5,
-  },
-  notesTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#088F8F",
-    marginBottom: 5,
   },
   notes: {
     fontSize: 14,
@@ -146,5 +134,5 @@ const styles = StyleSheet.create({
     color: "#888",
     textAlign: "center",
     marginTop: 20,
-  }
+  },
 });
