@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,15 +8,13 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { apiRequest } from "./api";
 
 export default function Homepage() {
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchSavedRecipes();
-  }, []);
+  const isFocused = useIsFocused();
 
   const fetchSavedRecipes = async () => {
     try {
@@ -29,12 +27,23 @@ export default function Homepage() {
     }
   };
 
+  useEffect(() => {
+    if (isFocused) {
+      // Each time this page is in focus, fetch the favorites.
+      setLoading(true);
+      fetchSavedRecipes();
+    }
+  }, [isFocused]);
+
   const removeFavorite = async (title) => {
     try {
       await apiRequest("/fridge/remove_favorite_recipe", "POST", { title });
-      // Remove instantly from the UI.
+      // Remove instantly from the UI (normalize title to avoid mismatch).
       setSavedRecipes((prevRecipes) =>
-        prevRecipes.filter((recipe) => recipe.title !== title)
+        prevRecipes.filter(
+          (recipe) =>
+            recipe.title.trim().toLowerCase() !== title.trim().toLowerCase()
+        )
       );
     } catch (error) {
       console.error("Error removing favorite recipe:", error);
@@ -81,21 +90,21 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     padding: 20,
     backgroundColor: "#F6FFF7",
   },
-  title: { 
-    fontSize: 32, 
-    fontWeight: "bold", 
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
     marginBottom: 10,
     color: "#088F8F",
     letterSpacing: 0.5,
   },
-  subtitle: { 
-    fontSize: 16, 
-    textAlign: "center", 
+  subtitle: {
+    fontSize: 16,
+    textAlign: "center",
     color: "#666",
     marginBottom: 20,
   },
