@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Image,
   View,
@@ -11,11 +11,64 @@ import {
 } from "react-native";
 import { apiRequest } from "./api";
 
-function Recipe({ text, fetchSavedRecipes }) {
-  // For debugging, we simply display the entire recipe text on one line.
+function Recipe({ title, description, fetchSavedRecipes }) {
+  const [isVisible, setIsVisible] = useState(true);
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  // The favorite functionality remains unchanged.
+  const checkIfFavorited = async () => {
+    try {
+      const data = await apiRequest("/fridge/get_favorite_recipes");
+      const isRecipeFavorited = data.some((recipe) => recipe.title === title);
+      setIsFavorited(isRecipeFavorited);
+    } catch (error) {
+      console.error("Error checking favorite status:", error);
+    }
+  };
+
+  React.useEffect(() => {
+    checkIfFavorited();
+  }, []);
+
+  const toggleFavorite = async () => {
+    try {
+      await apiRequest("/recipes/favorite", "POST", {
+        title,
+        description,
+        isFavorited: !isFavorited,
+      });
+      setIsFavorited(!isFavorited);
+      fetchSavedRecipes();
+    } catch (error) {
+      console.error("Error updating favorite status:", error);
+    }
+  };
+
   return (
     <View style={styles.recipeCard}>
-      <Text style={styles.recipeText}>{text}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={toggleFavorite}>
+          <Image
+            source={
+              isFavorited
+                ? require("../assets/images/favorited.png")
+                : require("../assets/images/emptyfavorite.png")
+            }
+            style={styles.favorite}
+          />
+        </TouchableOpacity>
+        <Text style={styles.recipeTitle}>{title}</Text>
+        <TouchableOpacity onPress={() => setIsVisible(!isVisible)} style={styles.toggle}>
+          <Image
+            source={
+              isVisible
+                ? require("../assets/images/toggleup.png")
+                : require("../assets/images/toggledown.png")
+            }
+          />
+        </TouchableOpacity>
+      </View>
+      {isVisible && <Text style={styles.recipeDescription}>{description}</Text>}
     </View>
   );
 }
@@ -27,27 +80,57 @@ export default function RecipePage() {
   const generateRecipes = async () => {
     setLoading(true);
     try {
-      const data = await apiRequest("/fridge/generate_recipes");
-      console.log("Received recipe data:", data);
+      const responseData = await apiRequest("/fridge/generate_recipes");
+      console.log("Raw response from apiRequest:", responseData);
+      // If the response is a string, attempt to parse it.
+      let data;
+      if (typeof responseData === "string") {
+        try {
+          data = JSON.parse(responseData);
+        } catch (parseError) {
+          console.error("Error parsing response JSON:", parseError);
+          data = responseData;
+        }
+      } else {
+        data = responseData;
+      }
+      console.log("Parsed recipe data:", data);
+      
       let formattedRecipes = [];
-
-      // If the backend returns separate keys (recipe1, recipe2, recipe3)
-      if (data.recipe1 || data.recipe2 || data.recipe3) {
+      // Case 1: Backend returns a single recipe object with keys: name, ingredients, and steps.
+      if (data.name && data.ingredients && data.steps) {
+        formattedRecipes.push({
+          title: data.name,
+          description: `Ingredients:\n${data.ingredients}\n\nSteps:\n${data.steps}`,
+        });
+      }
+      // Case 2: Backend returns multiple recipes under keys: recipe1, recipe2, recipe3.
+      else if (data.recipe1 || data.recipe2 || data.recipe3) {
         const recipesArray = [];
         if (data.recipe1) recipesArray.push(data.recipe1);
         if (data.recipe2) recipesArray.push(data.recipe2);
         if (data.recipe3) recipesArray.push(data.recipe3);
         formattedRecipes = recipesArray.map((recipe) => {
-          // If it's an object, convert it to a string; otherwise use it directly.
-          return { text: typeof recipe === "object" ? JSON.stringify(recipe) : recipe };
+          if (typeof recipe === "string") {
+            const splitIndex = recipe.indexOf("\n");
+            const title = recipe.substring(0, splitIndex);
+            const description = recipe.substring(splitIndex + 1).trim();
+            return { title, description };
+          }
+          // If recipe is already an object.
+          return recipe;
         });
       }
-      // Else if the backend returns a single string under "recipes"
+      // Case 3: Backend returns a single string under "recipes".
       else if (data.recipes && typeof data.recipes === "string") {
         formattedRecipes = data.recipes.split("\n\n").map((recipe) => {
-          return { text: recipe };
+          const splitIndex = recipe.indexOf("\n");
+          const title = recipe.substring(0, splitIndex);
+          const description = recipe.substring(splitIndex + 1).trim();
+          return { title, description };
         });
       }
+      
       setRecipes(formattedRecipes);
     } catch (error) {
       Alert.alert("Error", "Failed to generate recipes. Please try again later.");
@@ -66,7 +149,12 @@ export default function RecipePage() {
       >
         {recipes.length > 0 ? (
           recipes.map((recipe, index) => (
-            <Recipe key={index} text={recipe.text} fetchSavedRecipes={generateRecipes} />
+            <Recipe
+              key={index}
+              title={recipe.title}
+              description={recipe.description}
+              fetchSavedRecipes={generateRecipes}
+            />
           ))
         ) : (
           <Text style={styles.noRecipes}>No recipes available. Generate some!</Text>
@@ -79,7 +167,11 @@ export default function RecipePage() {
           activeOpacity={0.8}
           disabled={loading}
         >
-          {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Generate Recipes</Text>}
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Generate Recipes</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -112,9 +204,28 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
   },
-  recipeText: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  favorite: {
+    width: 24,
+    height: 24,
+    marginRight: 10,
+  },
+  toggle: {
+    marginLeft: "auto",
+  },
+  recipeTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 10,
+    color: "#088F8F",
+  },
+  recipeDescription: {
     fontSize: 16,
     color: "#666",
+    lineHeight: 22,
   },
   noRecipes: {
     fontSize: 18,
