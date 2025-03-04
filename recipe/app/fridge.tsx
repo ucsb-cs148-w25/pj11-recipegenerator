@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Image, View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, ScrollView } from "react-native";
+import { apiRequest } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function FridgePage() {
   const [items, setItems] = useState([]);
@@ -13,8 +15,9 @@ export default function FridgePage() {
 
   const fetchItems = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/get");
-      const data = await response.json();
+      // Call the endpoint without a user ID in the URL.
+      const data = await apiRequest("/fridge/get");
+      console.log("User-specific fridge items:", data);
       if (Array.isArray(data)) {
         setItems(data);
       } else {
@@ -29,12 +32,7 @@ export default function FridgePage() {
   const addItem = async () => {
     if (!name || !quantity) return;
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, quantity: parseInt(quantity) }),
-      });
-      const data = await response.json();
+      const data = await apiRequest("/fridge/add", "POST", { name, quantity: parseInt(quantity) });
       setItems(data.all_items);
       setName("");
       setQuantity("");
@@ -49,12 +47,7 @@ export default function FridgePage() {
     const newQuantity = editingQuantity[itemName];
     if (newQuantity === "") return;
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: itemName, quantity: parseInt(newQuantity) || 0 }),
-      });
-      const data = await response.json();
+      const data = await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: parseInt(newQuantity) || 0 });
       setItems(data.all_items);
       fetchItems();
     } catch (error) {
@@ -64,16 +57,8 @@ export default function FridgePage() {
 
   const removeItemCompletely = async (itemName) => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/remove", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: itemName, quantity: 1000000000 }), // Remove completely
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-      fetchItems(); // 🔹 Refresh the item list to prevent clearing all items
+      await apiRequest("/fridge/remove", "POST", { name: itemName, quantity: 1000000000 });
+      fetchItems();
     } catch (error) {
       console.error("Error removing item completely:", error);
     }
@@ -82,61 +67,34 @@ export default function FridgePage() {
   const decrementQuantity = async (itemName, currentQuantity) => {
     try {
       if (currentQuantity > 1) {
-        const newQuantity = currentQuantity - 1; // Calculate new quantity
-  
-        const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: itemName, quantity: newQuantity }),
-        });
-  
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Error ${response.status}: ${errorText}`);
-        }
-  
+        const newQuantity = currentQuantity - 1;
+        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
         setEditingQuantity((prev) => ({
           ...prev,
-          [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+          [itemName]: String(newQuantity),
         }));
-  
-        fetchItems(); // Refresh the item list
+        fetchItems();
       } else {
-        removeItemCompletely(itemName); // If last item, remove it entirely
+        removeItemCompletely(itemName);
       }
     } catch (error) {
       console.error("Error decrementing item:", error);
     }
   };
-  
 
-  
   const incrementQuantity = async (itemName, currentQuantity) => {
     try {
-      const newQuantity = currentQuantity + 1; // Increment quantity by 1
-  
-      const response = await fetch("http://127.0.0.1:8000/fridge/update_quantity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: itemName, quantity: newQuantity }),
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-  
+      const newQuantity = currentQuantity + 1;
+      await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
       setEditingQuantity((prev) => ({
         ...prev,
-        [itemName]: String(newQuantity), // Ensure UI reflects updated quantity
+        [itemName]: String(newQuantity),
       }));
-  
-      fetchItems(); // Refresh the item list after update
+      fetchItems();
     } catch (error) {
       console.error("Error incrementing quantity:", error);
     }
   };
-  
 
   return (
     <ScrollView style={styles.container}>
@@ -156,8 +114,14 @@ export default function FridgePage() {
             <TextInput
               style={styles.quantityInput}
               keyboardType="numeric"
-              value={editingQuantity[item.name] !== undefined ? editingQuantity[item.name] : String(item.quantity)}
-              onChangeText={(text) => setEditingQuantity({ ...editingQuantity, [item.name]: text })}
+              value={
+                editingQuantity[item.name] !== undefined
+                  ? editingQuantity[item.name]
+                  : String(item.quantity)
+              }
+              onChangeText={(text) =>
+                setEditingQuantity({ ...editingQuantity, [item.name]: text })
+              }
               onSubmitEditing={() => updateQuantity(item.name)}
             />
             <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
