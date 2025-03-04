@@ -135,77 +135,75 @@ def get_items(user_id: str = Depends(get_current_user)):
 @app.post("/fridge/add", response_model=AddItemResponse)
 def add_item(item: Item, user_id: str = Depends(get_current_user)):
     """
-    Add an item to the fridge. The request body is validated by Item. 
-    Response is enforced by AddItemResponse.
+    Add an item to the fridge for the current user.
     """
-    # Upsert the item in the database using `user_id` from JWT
+    # Upsert the item using both user_id and name.
     fridge_items.update_one(
         {"user_id": user_id, "name": item.name},
         {"$inc": {"quantity": item.quantity}},
         upsert=True
     )
-
     print(f"Authenticated user: {user_id}")
-    
-    # Get the updated list of items
     all_items_fridge = get_items(user_id)
-    
     return AddItemResponse(
         message=f"{item.quantity} {item.name}(s) added to the fridge.",
         all_items=all_items_fridge
     )
 
-
 @app.post("/fridge/remove", response_model=RemoveItemResponse)
 def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     """
-    Remove an item from the fridge.
+    Remove an item from the fridge for the current user.
     """
     existing_item = fridge_items.find_one({"user_id": user_id, "name": item.name})
     if not existing_item:
         raise HTTPException(status_code=404, detail="Item not found in the fridge.")
 
-    if item.quantity == 1000000000:  # Remove entire item
-        fridge_items.delete_one({"name": item.name})
+    if item.quantity == 1000000000:  # Remove the entire item
+        fridge_items.delete_one({"user_id": user_id, "name": item.name})
         message = f"{item.name} completely removed."
     else:
         if existing_item["quantity"] < item.quantity:
             raise HTTPException(status_code=400, detail="Not enough items in the fridge.")
         new_quantity = existing_item["quantity"] - item.quantity
         if new_quantity > 0:
-            fridge_items.update_one({"name": item.name}, {"$set": {"quantity": new_quantity}})
+            fridge_items.update_one(
+                {"user_id": user_id, "name": item.name},
+                {"$set": {"quantity": new_quantity}}
+            )
             message = f"Decremented {item.name} by {item.quantity}."
         else:
-            fridge_items.delete_one({"name": item.name})
+            fridge_items.delete_one({"user_id": user_id, "name": item.name})
             message = f"{item.name} removed."
 
     return RemoveItemResponse(
         message=message,
-        all_items=get_items()
+        all_items=get_items(user_id)
     )
 
 @app.post("/fridge/update_quantity", response_model=UpdateItemResponse)
-def update_quantity(item: Item):
+def update_quantity(item: Item, user_id: str = Depends(get_current_user)):
     """
-    Update the quantity of an item in the fridge.
+    Update the quantity of an item in the fridge for the current user.
     """
-    existing_item = fridge_items.find_one({"name": item.name})
-
+    existing_item = fridge_items.find_one({"user_id": user_id, "name": item.name})
     if not existing_item:
         raise HTTPException(status_code=404, detail="Item not found in the fridge.")
 
     if item.quantity <= 0:
-        fridge_items.delete_one({"name": item.name})
+        fridge_items.delete_one({"user_id": user_id, "name": item.name})
         message = f"{item.name} removed from the fridge."
     else:
-        fridge_items.update_one({"name": item.name}, {"$set": {"quantity": item.quantity}})
+        fridge_items.update_one(
+            {"user_id": user_id, "name": item.name},
+            {"$set": {"quantity": item.quantity}}
+        )
         message = f"{item.name} quantity updated to {item.quantity}."
 
     return UpdateItemResponse(
         message=message,
-        all_items=get_items()
+        all_items=get_items(user_id)
     )
-
 
 @app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
 def generate_suggestions(user_id: str = Depends(get_current_user)):
@@ -229,7 +227,7 @@ def generate_suggestions(user_id: str = Depends(get_current_user)):
     return GenerateSuggestionsResponse(suggestions=suggestions)
 
 @app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
-def generate_recipes():
+def generate_recipes(user_id: str = Depends(get_current_user)):
     """
     Generate three recipe suggestions based on current fridge contents using an ML function.
     Response is enforced by GenerateRecipesResponse, returning structured JSON.
@@ -237,7 +235,7 @@ def generate_recipes():
     Raises a 400 error if the fridge is empty, or a 500 error if recipe generation fails.
     """
     # Get all items from the fridge as (name, quantity) tuples
-    items_cursor = fridge_items.find()
+    items_cursor = fridge_items.find({"user_id": user_id})
     fridge_contents = [(doc["name"], doc["quantity"]) for doc in items_cursor]
 
     if not fridge_contents:
@@ -315,50 +313,44 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
 
 
 @app.get("/fridge/get_favorite_recipes")
-def get_favorite_recipes():
+def get_favorite_recipes(user_id: str = Depends(get_current_user)):
     """
-    Retrieve all saved (favorited) recipes.
+    Retrieve all favorite recipes for the current user.
     """
-    favorite_recipes_cursor = favorite_recipes.find()
+    favorite_recipes_cursor = favorite_recipes.find({"user_id": user_id})
     favorite_recipes_list = [
         {
             "id": str(recipe["_id"]),
             "title": recipe["title"],
-            "description": recipe.get("description", ""),
+            "description": recipe.get("description", "")
         }
         for recipe in favorite_recipes_cursor
     ]
-    
     return favorite_recipes_list
 
 @app.post("/recipes/favorite")
-def favorite_recipe(recipe: FavoriteRecipe):
+def favorite_recipe(recipe: FavoriteRecipe, user_id: str = Depends(get_current_user)):
     """
-    Add or remove a recipe from favorites.
-    If `isFavorited` is True, add it to favorites.
-    If `isFavorited` is False, remove it.
+    Add or remove a recipe from favorites for the current user.
+    If `isFavorited` is True, add it; otherwise, remove it.
     """
     if recipe.isFavorited:
         favorite_recipes.update_one(
-            {"title": recipe.title},
-            {"$set": {"description": recipe.description}},
+            {"user_id": user_id, "title": recipe.title},
+            {"$set": {"description": recipe.description, "user_id": user_id}},
             upsert=True
         )
         return {"message": f"Added {recipe.title} to favorites"}
     else:
-        favorite_recipes.delete_one({"title": recipe.title})
+        favorite_recipes.delete_one({"user_id": user_id, "title": recipe.title})
         return {"message": f"Removed {recipe.title} from favorites"}
 
-
-
 @app.post("/fridge/remove_favorite_recipe")
-def remove_favorite_recipe(recipe: RemoveFavoriteRequest):
+def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends(get_current_user)):
     """
-    Remove a recipe from favorites by title.
+    Remove a favorite recipe by title for the current user.
     """
-    result = favorite_recipes.delete_one({"title": recipe.title})
-
+    result = favorite_recipes.delete_one({"user_id": user_id, "title": recipe.title})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Recipe not found")
-
     return {"message": f"Removed {recipe.title} from favorites"}
