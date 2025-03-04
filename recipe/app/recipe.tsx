@@ -9,70 +9,13 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { apiRequest } from "./api";
 
-function Recipe({ title, description, fetchSavedRecipes }) {
-  const [isVisible, setIsVisible] = useState(true);
-  const [isFavorited, setIsFavorited] = useState(false);
-
-  useEffect(() => {
-    checkIfFavorited();
-  }, []);
-
-  const checkIfFavorited = async () => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/get_favorite_recipes");
-      if (!response.ok) throw new Error("Failed to fetch saved recipes.");
-
-      const data = await response.json();
-      const isRecipeFavorited = data.some((recipe) => recipe.title === title);
-      setIsFavorited(isRecipeFavorited);
-    } catch (error) {
-      console.error("Error checking favorite status:", error);
-    }
-  };
-
-  const toggleFavorite = async () => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/recipes/favorite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, isFavorited: !isFavorited }),
-      });
-
-      if (!response.ok) throw new Error("Failed to update favorite status.");
-
-      setIsFavorited(!isFavorited);
-      fetchSavedRecipes();
-    } catch (error) {
-      console.error("Error updating favorite status:", error);
-    }
-  };
-
+function Recipe({ text, fetchSavedRecipes }) {
+  // For debugging, we simply display the entire recipe text on one line.
   return (
     <View style={styles.recipeCard}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={toggleFavorite}>
-          <Image
-            source={
-              isFavorited
-                ? require("../assets/images/favorited.png")
-                : require("../assets/images/emptyfavorite.png")
-            }
-            style={styles.favorite}
-          />
-        </TouchableOpacity>
-        <Text style={styles.recipeTitle}>{title}</Text>
-        <TouchableOpacity onPress={() => setIsVisible(!isVisible)} style={styles.toggle}>
-          <Image
-            source={
-              isVisible
-                ? require("../assets/images/toggleup.png")
-                : require("../assets/images/toggledown.png")
-            }
-          />
-        </TouchableOpacity>
-      </View>
-      {isVisible && <Text style={styles.recipeDescription}>{description}</Text>}
+      <Text style={styles.recipeText}>{text}</Text>
     </View>
   );
 }
@@ -84,25 +27,31 @@ export default function RecipePage() {
   const generateRecipes = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/fridge/generate_recipes", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
+      const data = await apiRequest("/fridge/generate_recipes");
+      console.log("Received recipe data:", data);
+      let formattedRecipes = [];
 
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-      const data = await response.json();
-      if (data.recipes) {
-        const formattedRecipes = data.recipes.split("\n\n").map((recipe) => {
-          const splitIndex = recipe.indexOf("\n");
-          const title = recipe.substring(0, splitIndex);
-          const description = recipe.substring(splitIndex + 1).trim();
-          return { title, description };
+      // If the backend returns separate keys (recipe1, recipe2, recipe3)
+      if (data.recipe1 || data.recipe2 || data.recipe3) {
+        const recipesArray = [];
+        if (data.recipe1) recipesArray.push(data.recipe1);
+        if (data.recipe2) recipesArray.push(data.recipe2);
+        if (data.recipe3) recipesArray.push(data.recipe3);
+        formattedRecipes = recipesArray.map((recipe) => {
+          // If it's an object, convert it to a string; otherwise use it directly.
+          return { text: typeof recipe === "object" ? JSON.stringify(recipe) : recipe };
         });
-        setRecipes(formattedRecipes);
       }
+      // Else if the backend returns a single string under "recipes"
+      else if (data.recipes && typeof data.recipes === "string") {
+        formattedRecipes = data.recipes.split("\n\n").map((recipe) => {
+          return { text: recipe };
+        });
+      }
+      setRecipes(formattedRecipes);
     } catch (error) {
       Alert.alert("Error", "Failed to generate recipes. Please try again later.");
+      console.error("Generate recipes error:", error);
     } finally {
       setLoading(false);
     }
@@ -111,20 +60,18 @@ export default function RecipePage() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Generated Recipes</Text>
-
       <ScrollView
         style={styles.recipesContainer}
         contentContainerStyle={styles.recipesContentContainer}
       >
         {recipes.length > 0 ? (
           recipes.map((recipe, index) => (
-            <Recipe key={index} title={recipe.title} description={recipe.description} fetchSavedRecipes={generateRecipes} />
+            <Recipe key={index} text={recipe.text} fetchSavedRecipes={generateRecipes} />
           ))
         ) : (
           <Text style={styles.noRecipes}>No recipes available. Generate some!</Text>
         )}
       </ScrollView>
-
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.button}
@@ -165,27 +112,9 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
   },
-  header: {
-    flexDirection: "row",
-  },
-  favorite: {
-    width: 24,
-    height: 24,
-    marginRight: 10,
-  },
-  toggle: {
-    marginLeft: "auto",
-  },
-  recipeTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#088F8F",
-  },
-  recipeDescription: {
+  recipeText: {
     fontSize: 16,
     color: "#666",
-    lineHeight: 22,
   },
   noRecipes: {
     fontSize: 18,
@@ -206,10 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     width: "100%",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
