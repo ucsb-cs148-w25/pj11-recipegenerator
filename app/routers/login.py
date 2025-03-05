@@ -20,7 +20,10 @@ ALGORITHM = "HS256"
 
 # The data we expect in the request body
 class GoogleLoginPayload(BaseModel):
-    accessToken: str
+    token: str           # Either an ID token or an Access token
+    tokenType: str       # "idToken" or "accessToken"
+    name: str = None
+    email: str = None
 
 TEST_USERS = {
     "testuser1": {"password": "password1", "user_id": "user_id_001", "name": "User One"},
@@ -57,26 +60,35 @@ def login(request: LoginRequest):
 @router.post("/google-login")
 async def google_login(payload: GoogleLoginPayload):
     """
-    Input: the user's Google access token from the frontend.
-    Output: JSONResponse containing a custom JWT token for the user 
-            if success, or a error if user is invalid or expired.
+    Accepts:
+      {
+        "token": "...",
+        "tokenType": "idToken" or "accessToken",
+        "name": "...",
+        "email": "..."
+      }
+    Verifies the token with Google, returns {"access_token": encodedJwtToken, "token_type": "bearer"}
     """
 
-    
-
     # Verify token with Google
-    user_info = await verify_google_access_token(payload.accessToken)
-    if not user_info:
+    if payload.tokenType == "accessToken":
+        userinfo = await verify_google_access_token(payload.token)
+    elif payload.tokenType == "idToken":
+        userinfo = await verify_google_id_token(payload.token)
+    else:
+        return JSONResponse(status_code=400, content={"error": "Unknown tokenType"})
+    
+    if not userinfo:
         return JSONResponse(
             status_code=401, 
-            content={"error": "Invalid or expired Google access token"}
+            content={"error": "Invalid or expired Google token: {payload.tokenType}"}
         )
 
     # Build JWT token: user ID, email, and expiration time(24 hours)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     payload_data = {
-        "sub": user_info["id"],      # "subject": the user ID from Google
-        "email": user_info["email"],
+        "sub": userinfo.get("id") or userinfo.get("sub"),      # "subject": the user ID from Google
+        "email": userinfo.get("email"),
         "exp": expires_at
     }
     # Sign the token with your SECRET_KEY
@@ -84,9 +96,11 @@ async def google_login(payload: GoogleLoginPayload):
 
     # 3) Return the token to the client
     return {
-        "token": my_jwt_token
+        "token": my_jwt_token, 
+        "token_type":"bearer"
     }
 
+# ============== HELPER FUNCTIONS ================== #
 async def verify_google_access_token(access_token: str):
     """
     Make a request to Google's UserInfo endpoint to validate the token.
@@ -106,6 +120,15 @@ async def verify_google_access_token(access_token: str):
         return resp.json()
     return None
 
+async def verify_google_id_token(id_token: str):
+    """
+    Check Google's /tokeninfo for an ID token.
+    Returns user info or None if invalid.
+    """
+    async with httpx.AsyncClient() as client:
+        url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+        resp = await client.get(url)
+    return resp.json() if resp.status_code == 200 else None
 
 #
 def get_current_user(token: str = Security(oauth2_scheme)):
