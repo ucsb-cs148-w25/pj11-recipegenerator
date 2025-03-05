@@ -11,10 +11,12 @@ import { jwtDecode } from "jwt-decode";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const webClientId = "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";
+const webClientId = "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";  // from Google Console (Web type)
+const iosClientId = "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com";  // from Google Console (iOS type)
 
 export type User = {
-  token?: string;
+  token?: string;       // could be either idToken or accessToken
+  tokenType?: string;   // "idToken" or "accessToken"
   userId?: string;
   guest?: boolean;
   name?: string;
@@ -26,16 +28,18 @@ interface LoginProps {
 }
 
 
-const sendUserDataToBackend = async (idToken: string) => {
+const sendUserDataToBackend = async (user: User) => {
+  console.log("Sending user idToken to backend:", user);
   try {
     const response = await fetch("http://localhost:8000/google-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken: idToken }),
+      body: JSON.stringify(user),
     });
 
     if (!response.ok) {
-      throw new Error(`Backend returned status ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Backend returned status ${response.status}`);
     }
 
     const result = await response.json();
@@ -58,43 +62,56 @@ export default function Login({ setUser }: LoginProps) {
   const navigation = useNavigation();
   const [error, setError] = useState<any>();
 
-  useEffect(() => {
+  // For iOS/Android native config
+  const configureGoogleSignin = () => {
     GoogleSignin.configure({
-      webClientId,
+      webClientId,     // optional for Android offline access
+      iosClientId,     // crucial for iOS native sign-in
       offlineAccess: true,
     });
+  };
+
+  useEffect(() => {
+    configureGoogleSignin();
   }, []);
 
 
+// ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
+    console.log("Pressed native sign in");
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      console.log("Attempting native (iOS/Android) Google sign in...");
 
       const info = await GoogleSignin.signIn();
-      if (info && info.user) {
-        const idToken = info.idToken;
-        const backendResponse = await sendUserDataToBackend(idToken);
+      console.log("Native sign in success, info from GoogleSignIn is:", info);
 
-        const userData = {
-          token: backendResponse.token,
-          userId: backendResponse.userId,
-          name: backendResponse.name,
-          email: backendResponse.email,
+      const result = info.data;
+      if (result && result.user) {
+        const userData: User = {
+          token: result.idToken,
+          tokenType: "idToken",
+          name: result.user.name,
+          email: result.user.email,
         };
 
         setUser(userData);
+        const backendResponse = await sendUserDataToBackend(userData);
+
       } else {
+        console.error("No user info returned. Full info:", info);
         Alert.alert("Sign In Error", "No user information returned from Google sign-in");
       }
     } catch (error: any) {
+      console.error("Native sign in error:", error);
       Alert.alert("Native sign-in error", error.message || JSON.stringify(error));
       setError(error);
     }
   };
 
+
+  // ========== WEB SIGN-IN (Expo AuthSession) ==========
   const redirectUri = makeRedirectUri({ useProxy: true });
-
-
   const [request, response, promptAsync] = GoogleAuthSession.useAuthRequest({
     clientId: webClientId,
     scopes: ["profile", "email"],
@@ -106,9 +123,11 @@ export default function Login({ setUser }: LoginProps) {
     if (response?.type === "success") {
       const { authentication } = response;
       if (authentication?.accessToken) {
+        console.log("Got access token from Expo AuthSession:", authentication.accessToken);
         handleAuthSession(authentication.accessToken);
       }
     } else if (response?.type === "error") {
+      console.error("Expo AuthSession error", response.error);
       Alert.alert("Authentication error", response.error || "Unknown error");
     }
   }, [response]);
@@ -116,14 +135,21 @@ export default function Login({ setUser }: LoginProps) {
 
   const handleAuthSession = async (accessToken: string) => {
     try {
-      const backendResponse = await sendUserDataToBackend(accessToken);
-
-      const userData = {
-        token: backendResponse.token,
-        userId: backendResponse.userId,
-        name: backendResponse.name,
-        email: backendResponse.email,
+      const res = await fetch(
+        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
+      );
+      const user = await res.json();
+      console.log("User info (Expo AuthSession):", user);
+      
+      const userData: User = {
+        token: accessToken,
+        tokenType: "accessToken",
+        name: user.name,
+        email: user.email,
       };
+      setUser(userData);
+
+      const backendResponse = await sendUserDataToBackend(userData);
 
       setUser(userData);
     } catch (error) {
@@ -131,11 +157,13 @@ export default function Login({ setUser }: LoginProps) {
     }
   };
 
+  // For guests
   const handleGuestLogin = () => {
     const guestUser = { guest: true, name: "Guest" };
     setUser(guestUser);
   };
 
+  // Decide which button to render
   const renderGoogleSignInButton = () => {
     if (Platform.OS === "web") {
       return (
