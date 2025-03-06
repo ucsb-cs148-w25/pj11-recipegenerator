@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Image,
+  Modal,
 } from "react-native";
 import { apiRequest } from "./api";
 
-function Recipe({ text, fetchSavedRecipes }) {
+function Recipe({ text, fetchSavedRecipes, fridgeItems, setFridgeItems }) {
   const [isVisible, setIsVisible] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Parse the JSON recipe data
   let recipeData;
@@ -23,7 +24,41 @@ function Recipe({ text, fetchSavedRecipes }) {
     recipeData = { name: "Unknown Recipe", detail: text };
   }
 
-  // Prepare ingredients content
+  // Helper: Extract the backend key from an ingredient.
+  // For an object ingredient, we assume ingredient.name matches the key.
+  // For a string, we use a heuristic: split by spaces and return the first token
+  // that does not include digits or measurement words.
+  const extractBackendKey = (ingredient) => {
+    if (typeof ingredient === "object" && ingredient.name) {
+      return ingredient.name.toLowerCase();
+    } else if (typeof ingredient === "string") {
+      const tokens = ingredient.split(" ");
+      const measurements = [
+        "g",
+        "kg",
+        "cup",
+        "cups",
+        "tablespoon",
+        "tablespoons",
+        "teaspoon",
+        "teaspoons",
+        "clove",
+        "cloves",
+        "ml",
+        "l",
+      ];
+      for (let token of tokens) {
+        token = token.replace(/[(),]/g, "");
+        if (/\d/.test(token)) continue;
+        if (measurements.includes(token.toLowerCase())) continue;
+        return token.toLowerCase();
+      }
+      return ingredient.toLowerCase();
+    }
+    return "";
+  };
+
+  // Prepare ingredients content for the recipe card
   let ingredientsContent = null;
   if (Array.isArray(recipeData.ingredients)) {
     ingredientsContent = (
@@ -31,7 +66,10 @@ function Recipe({ text, fetchSavedRecipes }) {
         <Text style={styles.sectionTitle}>Ingredients:</Text>
         {recipeData.ingredients.map((ingredient, index) => (
           <Text key={index} style={styles.ingredient}>
-            • {ingredient}
+            •{" "}
+            {typeof ingredient === "object"
+              ? `${ingredient.name}: ${ingredient.quantity}`
+              : ingredient}
           </Text>
         ))}
       </View>
@@ -45,7 +83,7 @@ function Recipe({ text, fetchSavedRecipes }) {
     );
   }
 
-  // Use the steps if available; if not, fallback to detail.
+  // Use steps if available; otherwise fallback to detail.
   const stepsContent = recipeData.steps ? (
     <View style={styles.stepsContainer}>
       <Text style={styles.sectionTitle}>Steps:</Text>
@@ -81,10 +119,15 @@ function Recipe({ text, fetchSavedRecipes }) {
   // Toggle favorite status using the API via apiRequest.
   const toggleFavorite = async () => {
     console.log("toggleFavorite pressed for:", recipeData.name);
-    // Build the description from the recipe data fields.
     const description =
       (Array.isArray(recipeData.ingredients)
-        ? recipeData.ingredients.join("\n")
+        ? recipeData.ingredients
+            .map((ingredient) =>
+              typeof ingredient === "object"
+                ? `${ingredient.name}: ${ingredient.quantity}`
+                : ingredient
+            )
+            .join("\n")
         : recipeData.ingredients || "") +
       "\n\n" +
       (recipeData.steps || recipeData.detail || "");
@@ -96,10 +139,66 @@ function Recipe({ text, fetchSavedRecipes }) {
       });
       console.log("Favorite toggle successful for:", recipeData.name);
       setIsFavorited(!isFavorited);
-      // Removed fetchSavedRecipes() call here so that toggling favorites doesn't regenerate recipes.
     } catch (error) {
       console.error("Error updating favorite status:", error);
     }
+  };
+
+  // Decrement the quantity of an item using the backend update_quantity endpoint.
+  const decrementQuantity = async (itemName, currentQuantity) => {
+    try {
+      if (currentQuantity > 1) {
+        const newQuantity = currentQuantity - 1;
+        const response = await apiRequest("/fridge/update_quantity", "POST", {
+          name: itemName,
+          quantity: newQuantity,
+        });
+        console.log(response.message);
+        setFridgeItems((prev) => ({
+          ...prev,
+          [itemName]: newQuantity,
+        }));
+      } else {
+        // Remove item completely if quantity drops to 0
+        const response = await apiRequest("/fridge/remove_item", "POST", {
+          name: itemName,
+        });
+        console.log(response.message);
+        setFridgeItems((prev) => {
+          const newState = { ...prev };
+          delete newState[itemName];
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error("Error decrementing item:", error);
+    }
+  };
+
+  // When "Cook" is pressed, show the modal.
+  const handleCookPress = () => {
+    setModalVisible(true);
+  };
+
+  // On confirmation, update each ingredient's quantity.
+  const handleConfirmCook = async () => {
+    if (Array.isArray(recipeData.ingredients)) {
+      for (const ingredient of recipeData.ingredients) {
+        const key = extractBackendKey(ingredient);
+        const currentQuantity = fridgeItems[key];
+        if (currentQuantity !== undefined) {
+          await decrementQuantity(key, currentQuantity);
+        } else {
+          console.warn(`Item "${key}" not found in fridge.`);
+        }
+      }
+    }
+    setModalVisible(false);
+  };
+
+  const handleCancelCook = () => {
+    console.log("Cooking cancelled");
+    setModalVisible(false);
   };
 
   return (
@@ -132,6 +231,54 @@ function Recipe({ text, fetchSavedRecipes }) {
           {stepsContent}
         </View>
       )}
+      {/* Cook Button */}
+      <TouchableOpacity style={styles.cookButton} onPress={handleCookPress}>
+        <Text style={styles.cookButtonText}>Cook</Text>
+      </TouchableOpacity>
+
+      {/* Modal: displays fridge ingredients and asks for confirmation */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Cooking Confirmation</Text>
+            {recipeData.ingredients && (
+              <View style={styles.modalIngredientsContainer}>
+                <Text style={styles.modalSectionTitle}>Fridge Ingredients:</Text>
+                {Array.isArray(recipeData.ingredients) ? (
+                  recipeData.ingredients.map((ingredient, index) => {
+                    const key = extractBackendKey(ingredient);
+                    const qty =
+                      fridgeItems[key] !== undefined ? fridgeItems[key] : "N/A";
+                    return (
+                      <Text key={index} style={styles.modalIngredientText}>
+                        • {key}: {qty}
+                      </Text>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.modalIngredientText}>
+                    {recipeData.ingredients}
+                  </Text>
+                )}
+              </View>
+            )}
+            <Text style={styles.modalText}>Do you want to cook this?</Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleCancelCook}>
+                <Text style={styles.modalButtonText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButton} onPress={handleConfirmCook}>
+                <Text style={styles.modalButtonText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -139,6 +286,18 @@ function Recipe({ text, fetchSavedRecipes }) {
 export default function RecipePage() {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Example fridge items state; keys should match the backend names (e.g., "beef", "corn")
+  const [fridgeItems, setFridgeItems] = useState({
+    beef: 2,
+    corn: 10,
+    onion: 5,
+    garlic: 4,
+    "red bell pepper": 3,
+    "soy sauce": 1,
+    "olive oil": 2,
+    salt: 10,
+    pepper: 8,
+  });
 
   const generateRecipes = async () => {
     setLoading(true);
@@ -147,13 +306,13 @@ export default function RecipePage() {
       console.log("Received recipe data:", data);
       let formattedRecipes = [];
 
-      // Case 1: Backend returns a single recipe object with keys "name", "ingredients", and "steps"
+      // Case 1: Single recipe object with "name", "ingredients", and "steps"
       if (data.name && data.ingredients && data.steps) {
         formattedRecipes.push({
           text: JSON.stringify(data),
         });
       }
-      // Case 2: Backend returns multiple recipes in keys "recipe1", "recipe2", "recipe3"
+      // Case 2: Multiple recipes under keys "recipe1", "recipe2", "recipe3"
       else if (data.recipe1 || data.recipe2 || data.recipe3) {
         const recipesArray = [];
         if (data.recipe1) recipesArray.push(data.recipe1);
@@ -163,7 +322,7 @@ export default function RecipePage() {
           text: typeof recipe === "object" ? JSON.stringify(recipe) : recipe,
         }));
       }
-      // Case 3: Backend returns a single string under "recipes"
+      // Case 3: A single string under "recipes"
       else if (data.recipes && typeof data.recipes === "string") {
         formattedRecipes = data.recipes.split("\n\n").map((recipe) => ({
           text: recipe,
@@ -172,7 +331,6 @@ export default function RecipePage() {
       
       setRecipes(formattedRecipes);
     } catch (error) {
-      Alert.alert("Error", "Failed to generate recipes. Please try again later.");
       console.error("Generate recipes error:", error);
     } finally {
       setLoading(false);
@@ -182,10 +340,19 @@ export default function RecipePage() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Generated Recipes</Text>
-      <ScrollView style={styles.recipesContainer} contentContainerStyle={styles.recipesContentContainer}>
+      <ScrollView
+        style={styles.recipesContainer}
+        contentContainerStyle={styles.recipesContentContainer}
+      >
         {recipes.length > 0 ? (
           recipes.map((recipe, index) => (
-            <Recipe key={index} text={recipe.text} fetchSavedRecipes={generateRecipes} />
+            <Recipe
+              key={index}
+              text={recipe.text}
+              fetchSavedRecipes={generateRecipes}
+              fridgeItems={fridgeItems}
+              setFridgeItems={setFridgeItems}
+            />
           ))
         ) : (
           <Text style={styles.noRecipes}>No recipes available. Generate some!</Text>
@@ -313,5 +480,73 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     letterSpacing: 1,
+  },
+  cookButton: {
+    backgroundColor: "#FF6347",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignSelf: "flex-end",
+    marginTop: 10,
+  },
+  cookButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  modalIngredientsContainer: {
+    width: "100%",
+    marginBottom: 15,
+  },
+  modalSectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  modalIngredientText: {
+    fontSize: 16,
+    color: "#666",
+    marginLeft: 10,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    backgroundColor: "#088F8F",
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
