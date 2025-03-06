@@ -286,8 +286,8 @@ export default function FridgePage() {
 
       {/* Floating Add Ingredient Section */}
       <View style={styles.floatingAddContainer}>
-        <TouchableOpacity style={styles.uploadButton}>
-          <FontAwesome name="upload" size={22} color="#088F8F" />
+        <TouchableOpacity style={styles.cameraButton}>
+          <FontAwesome name="camera" size={22} color="#088F8F" />
         </TouchableOpacity>
 
         <View style={styles.inputContainer}>
@@ -306,9 +306,7 @@ export default function FridgePage() {
             onChangeText={setQuantity}
             keyboardType="numeric"
           />
-          <TouchableOpacity style={styles.cameraButton}>
-            <FontAwesome name="camera" size={20} color="#088F8F" />
-          </TouchableOpacity>
+
         </View>
 
         <TouchableOpacity style={styles.floatingAddButton} onPress={addItem}>
@@ -417,20 +415,7 @@ const styles = StyleSheet.create({
     zIndex: 999,
     backgroundColor: 'transparent',
   },
-  uploadButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
+
   inputContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -450,9 +435,6 @@ const styles = StyleSheet.create({
     height: 40,
     fontSize: 16,
     color: '#333',
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
   },
   quantityFloatingInput: {
     flex: 1,
@@ -463,13 +445,20 @@ const styles = StyleSheet.create({
     borderLeftColor: '#E0E0E0',
     paddingLeft: 10,
     marginLeft: 5,
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    borderColor: 'transparent',
   },
   cameraButton: {
-    marginLeft: 10,
-    padding: 5,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   floatingAddButton: {
     width: 44,
