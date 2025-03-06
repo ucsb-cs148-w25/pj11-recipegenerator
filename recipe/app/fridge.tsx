@@ -170,7 +170,7 @@ export default function FridgePage() {
     try {
       if (currentQuantity > 1) {
         const newQuantity = currentQuantity - 1;
-        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
+        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity } as any);
         setEditingQuantity(prev => ({ ...prev, [itemName]: String(newQuantity) }));
         fetchItems();
       } else {
