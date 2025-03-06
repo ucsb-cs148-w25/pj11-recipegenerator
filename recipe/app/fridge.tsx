@@ -10,8 +10,6 @@ import {
   FlatList,
 } from "react-native";
 import { FontAwesome } from '@expo/vector-icons';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { apiRequest } from "./api";
 import SwipeableItem from "./SwipeableItem";  // <-- import our custom component
 
