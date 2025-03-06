@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  Image,
   View,
   Text,
   StyleSheet,
@@ -8,11 +7,13 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  FlatList,
 } from "react-native";
-import { SwipeListView } from 'react-native-swipe-list-view';
-import { apiRequest } from "./api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FontAwesome } from '@expo/vector-icons';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { apiRequest } from "./api";
+import SwipeableItem from "./SwipeableItem";  // <-- import our custom component
 
 // Define types for our items and refs
 type FridgeItem = {
@@ -29,14 +30,13 @@ type AnimationRefs = {
   [key: string]: Animated.Value;
 };
 
-// Type for deleted items (for undo)
 type DeletedItem = {
   item: FridgeItem;
   timestamp: number;
+  originalIndex?: number;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DELETE_THRESHOLD = SCREEN_WIDTH * 0.35; // 35% threshold
 
 export default function FridgePage() {
   const [items, setItems] = useState<FridgeItem[]>([]);
@@ -44,16 +44,13 @@ export default function FridgePage() {
   const [quantity, setQuantity] = useState("");
   const [editingQuantity, setEditingQuantity] = useState<{ [key: string]: string }>({});
   const [deletedItems, setDeletedItems] = useState<{ [key: string]: DeletedItem }>({});
-  const [trashJumped, setTrashJumped] = useState(false); // flag to avoid re-triggering jump
   const timersRef = useRef<TimerRefs>({});
   const fadeAnimRef = useRef<AnimationRefs>({});
-  const trashAnim = useRef(new Animated.Value(0)); // for trash can jump animation
-  const listRef = useRef<SwipeListView<FridgeItem>>(null);
 
   useEffect(() => {
     fetchItems();
     return () => {
-      // Clear timers when component unmounts
+      // Clean up timers on unmount
       Object.values(timersRef.current).forEach(timer => clearTimeout(timer));
     };
   }, []);
@@ -61,11 +58,9 @@ export default function FridgePage() {
   const fetchItems = async () => {
     try {
       const data = await apiRequest("/fridge/get");
-      console.log("User-specific fridge items:", data);
       if (Array.isArray(data)) {
         setItems(data);
       } else {
-        console.error("Unexpected data format:", data);
         setItems([]);
       }
     } catch (error) {
@@ -98,27 +93,25 @@ export default function FridgePage() {
   };
 
   const deleteItem = async (item: FridgeItem) => {
-    // Store the item for potential undo
     const itemName = item.name;
 
-    // Add to deleted items
+    // Find the index of the item before removing it (for restoring position)
+    const itemIndex = items.findIndex(i => i.name === itemName);
+
+    // Store for potential undo with original index
     setDeletedItems(prev => ({
       ...prev,
       [itemName]: {
-        item: item,
-        timestamp: Date.now()
+        item,
+        timestamp: Date.now(),
+        originalIndex: itemIndex >= 0 ? itemIndex : 0 // Store the original position
       }
     }));
 
     // Remove from the current list
-    setItems(prevItems => prevItems.filter(i => i.name !== itemName));
+    setItems(prev => prev.filter(i => i.name !== itemName));
 
-    // Clear any existing timer for this item
-    if (timersRef.current[itemName]) {
-      clearTimeout(timersRef.current[itemName]);
-    }
-
-    // Create fade animation for the toast
+    // Fade animation for the toast
     fadeAnimRef.current[itemName] = new Animated.Value(1);
 
     // Start fade animation after 4.5 seconds
@@ -156,31 +149,32 @@ export default function FridgePage() {
       delete timersRef.current[itemName];
     }
 
-    // Add the item back to the list with a small delay to ensure UI updates properly
-    setTimeout(() => {
-      setItems(prevItems => [...prevItems, deletedItem.item]);
+    // Add back to items at the original position
+    setItems(prev => {
+      const newItems = [...prev];
+      // Insert at original position if possible, otherwise at the beginning
+      const insertIndex = Math.min(deletedItem.originalIndex || 0, newItems.length);
+      newItems.splice(insertIndex, 0, deletedItem.item);
+      return newItems;
+    });
 
-      // Remove from deleted items state
-      setDeletedItems(prev => {
-        const updated = { ...prev };
-        delete updated[itemName];
-        return updated;
-      });
-    }, 50);
+    // Remove from deleted items
+    setDeletedItems(prev => {
+      const updated = { ...prev };
+      delete updated[itemName];
+      return updated;
+    });
   };
 
   const decrementQuantity = async (itemName: string, currentQuantity: number) => {
     try {
       if (currentQuantity > 1) {
         const newQuantity = currentQuantity - 1;
-        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity } as any);
-        setEditingQuantity((prev) => ({
-          ...prev,
-          [itemName]: String(newQuantity),
-        }));
+        await apiRequest("/fridge/update_quantity", "POST", { name: itemName, quantity: newQuantity });
+        setEditingQuantity(prev => ({ ...prev, [itemName]: String(newQuantity) }));
         fetchItems();
       } else {
-        // Find the item to delete
+        // If it goes to 0, just delete
         const itemToDelete = items.find(item => item.name === itemName);
         if (itemToDelete) {
           deleteItem(itemToDelete);
@@ -205,83 +199,58 @@ export default function FridgePage() {
     }
   };
 
-  const renderItem = ({ item }: { item: FridgeItem }) => (
-    <View style={styles.ingredientItem}>
-      <Text style={styles.ingredientText}>{item.name}</Text>
-      <View style={styles.quantityControls}>
-        <TouchableOpacity onPress={() => decrementQuantity(item.name, item.quantity)}>
-          <Text style={styles.quantityButton}>-</Text>
-        </TouchableOpacity>
-        <TextInput
-          style={styles.quantityInput}
-          keyboardType="numeric"
-          value={editingQuantity[item.name] !== undefined ? editingQuantity[item.name] : String(item.quantity)}
-          onChangeText={(text) => setEditingQuantity({ ...editingQuantity, [item.name]: text })}
-          onSubmitEditing={() => updateQuantity(item.name)}
-        />
-        <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
-          <Text style={styles.quantityButton}>+</Text>
-        </TouchableOpacity>
+  // The actual UI of a single row (inside the swipeable front card)
+  const renderFridgeItemContent = (item: FridgeItem) => {
+    return (
+      <View style={styles.ingredientItem}>
+        <Text style={styles.ingredientText}>{item.name}</Text>
+        <View style={styles.quantityControls}>
+          <TouchableOpacity onPress={() => decrementQuantity(item.name, item.quantity)}>
+            <Text style={styles.quantityButton}>-</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={styles.quantityInput}
+            keyboardType="numeric"
+            value={
+              editingQuantity[item.name] !== undefined
+                ? editingQuantity[item.name]
+                : String(item.quantity)
+            }
+            onChangeText={(text) =>
+              setEditingQuantity({ ...editingQuantity, [item.name]: text })
+            }
+            onSubmitEditing={() => updateQuantity(item.name)}
+          />
+          <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
+            <Text style={styles.quantityButton}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
-
-  // Render the hidden row with a red background and trash can icon
-  const renderHiddenItem = ({ item }: { item: FridgeItem }) => (
-    <View style={styles.rowBack}>
-      <Animated.View style={[styles.trashIconContainer, { transform: [{ translateY: trashAnim.current }] }]}>
-        <FontAwesome name="trash" size={24} color="white" />
-      </Animated.View>
-    </View>
-  );
-
-  // onSwipeValueChange handles the trash can jump but does not trigger deletion
-  const onSwipeValueChange = (swipeData: any) => {
-    const { key, value, isOpen } = swipeData;
-    if (value < -DELETE_THRESHOLD && !isOpen) {
-      const item = items.find(i => (i.id || i.name) === key);
-      if (item && !deletedItems[item.name]) { // Only delete if not already in deletedItems
-        setTimeout(() => {
-          deleteItem(item);
-        }, 300);
-      }
-    }
+    );
   };
 
-  // onRowDidOpen is called when the user releases their finger and the row is fully open.
-  // At that point, we animate the row (if needed) and trigger deletion.
-  const onRowDidOpen = (rowKey: string) => {
-    const item = items.find(i => (i.id || i.name) === rowKey);
-    if (item && !deletedItems[item.name]) { // Only delete if not already in deletedItems
-      // Here you can add an extra animation if desired.
-      // For example, you could animate the row's red background sliding fully in.
-      // In this example, we simply wait a short duration before deleting.
-      setTimeout(() => {
-        deleteItem(item);
-      }, 300); // delay to let any final animation complete
-    }
+  // Render each item in the FlatList using our custom swipeable row
+  const renderItem = ({ item }: { item: FridgeItem }) => {
+    return (
+      <SwipeableItem
+        onDelete={() => deleteItem(item)}
+        borderRadius={10}
+      >
+        {renderFridgeItemContent(item)}
+      </SwipeableItem>
+    );
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
 
-      <SwipeListView
-        ref={listRef}
+      {/* Our custom swipe-to-delete list */}
+      <FlatList
         data={items}
         keyExtractor={(item) => item.id || item.name}
         renderItem={renderItem}
-        renderHiddenItem={renderHiddenItem}
-        rightOpenValue={-SCREEN_WIDTH} // row slides fully offscreen
-        leftOpenValue={0}
-        disableRightSwipe
-        friction={15}
-        tension={0}
-        swipeToOpenPercent={35}
-        onSwipeValueChange={onSwipeValueChange}
-        onRowDidOpen={onRowDidOpen}  // triggers deletion only after release
-        useNativeDriver={true}
-        style={styles.list}
+        contentContainerStyle={{ paddingBottom: 120 }}
       />
 
       {/* Floating Add Ingredient Section */}
@@ -306,7 +275,6 @@ export default function FridgePage() {
             onChangeText={setQuantity}
             keyboardType="numeric"
           />
-
         </View>
 
         <TouchableOpacity style={styles.floatingAddButton} onPress={addItem}>
@@ -314,13 +282,17 @@ export default function FridgePage() {
         </TouchableOpacity>
       </View>
 
+      {/* Undo Toasts */}
       {Object.keys(deletedItems).map(itemName => (
         <Animated.View
           key={itemName}
           style={[styles.undoToast, { opacity: fadeAnimRef.current[itemName] || 1 }]}
         >
           <Text style={styles.undoText}>"{itemName}" removed</Text>
-          <TouchableOpacity style={styles.undoButtonContainer} onPress={() => undoDeleteItem(itemName)}>
+          <TouchableOpacity
+            style={styles.undoButtonContainer}
+            onPress={() => undoDeleteItem(itemName)}
+          >
             <Text style={styles.undoButton}>UNDO</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -332,8 +304,8 @@ export default function FridgePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#F6FFF7",
+    padding: 20,
   },
   title: {
     fontSize: 32,
@@ -342,24 +314,14 @@ const styles = StyleSheet.create({
     color: "#088F8F",
     letterSpacing: 0.5,
   },
-  list: {
-    marginBottom: 100, // Increased space for the floating input
-    paddingBottom: 20,
-  },
   ingredientItem: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
     backgroundColor: "white",
-    borderRadius: 15,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderRadius: 10,
+    padding: 15,
   },
   ingredientText: {
     fontSize: 16,
@@ -385,25 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: "white",
   },
-  rowBack: {
-    alignItems: 'center',
-    backgroundColor: '#FF6B6B',
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingRight: 15,
-    borderRadius: 15,
-    marginBottom: 10,
-  },
-  trashIconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: 75,
-  },
+  /* Floating Add Section */
   floatingAddContainer: {
     position: 'absolute',
     bottom: 20,
@@ -412,10 +356,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 999,
-    backgroundColor: 'transparent',
   },
-
+  cameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
   inputContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -434,6 +389,7 @@ const styles = StyleSheet.create({
     flex: 2,
     height: 40,
     fontSize: 16,
+    paddingLeft: 5,
     color: '#333',
   },
   quantityFloatingInput: {
@@ -445,20 +401,6 @@ const styles = StyleSheet.create({
     borderLeftColor: '#E0E0E0',
     paddingLeft: 10,
     marginLeft: 5,
-  },
-  cameraButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
   },
   floatingAddButton: {
     width: 44,
@@ -474,6 +416,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  /* Undo Toast */
   undoToast: {
     position: 'absolute',
     bottom: 70,
@@ -505,5 +448,5 @@ const styles = StyleSheet.create({
     color: '#4CBBCE',
     fontWeight: 'bold',
     fontSize: 14,
-  }
+  },
 });
