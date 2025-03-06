@@ -104,9 +104,7 @@ export default function FridgePage() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.ingredientItem}>
-            <TouchableOpacity onPress={() => removeItemCompletely(item.name)}>
-              <Text style={styles.removeButton}>🗑</Text>
-            </TouchableOpacity>
+
             <Text style={styles.ingredientText}>{item.name}</Text>
             <TouchableOpacity onPress={() => decrementQuantity(item.name, item.quantity)}>
               <Text style={styles.quantityButton}>-</Text>
@@ -126,6 +124,9 @@ export default function FridgePage() {
             />
             <TouchableOpacity onPress={() => incrementQuantity(item.name, item.quantity)}>
               <Text style={styles.quantityButton}>+</Text>
+            </TouchableOpacity>
+                        <TouchableOpacity onPress={() => removeItemCompletely(item.name)}>
+              <Text style={styles.removeButton}>🗑</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -153,12 +154,12 @@ export default function FridgePage() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     padding: 20,
     backgroundColor: "#F6FFF7",
   },
-  title: { 
+  title: {
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 10,
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  input: { 
+  input: {
     borderWidth: 1,
     borderColor: "#088F8F",
     padding: 10,
