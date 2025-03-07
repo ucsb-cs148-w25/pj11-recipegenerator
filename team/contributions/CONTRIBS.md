@@ -31,6 +31,7 @@ This document outlines the roles and contributions of each team member to the pr
 - **Design & Branding:**
   - Created and refined key UI elements such as profile icons, toggle buttons, and favorite/unfavorite icons.
   - Contributed to the overall theme and branding of the application.
+  - Made the Figma and mobile app design
 - **Frontend Implementation:**
   - Developed the friends feature, enabling users to view and manage friends’ recipes.
   - Enhanced the profile page, allowing users to view and save their recipes with interactive toggles for additional details.
