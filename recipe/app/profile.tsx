@@ -1,8 +1,8 @@
-import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal} from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from "react-native";
 import { router } from 'expo-router';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User } from './login';
-import {GoogleSignin, statusCodes} from "@react-native-google-signin/google-signin";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 
 interface ProfilePageProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -18,9 +18,9 @@ interface Friend {
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [suggestedFriendsModalVisible, setSuggestedFriendsModalVisible] = useState<boolean>(false);
-  
-  // Current friends list
-  const [friends, setFriends] = useState<Friend[]>([
+
+  // All possible friends (both current and potential)
+  const allPossibleFriends: Friend[] = [
     {
       id: '1',
       name: 'Chappell Roan',
@@ -35,11 +35,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       id: '3',
       name: 'Tobias Hollerer',
       recipes: ['Margherita Pizza', 'Pumpkin Soup', 'Grilled Salmon']
-    }
-  ]);
-
-  // Suggested friends list (would come from API in a real app)
-  const suggestedFriends: Friend[] = [
+    },
     {
       id: '4',
       name: 'Taylor Swift',
@@ -57,19 +53,29 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   ];
 
-  // Filter out friends that are already added
-  const filteredSuggestedFriends = suggestedFriends.filter(
-    suggestedFriend => !friends.some(friend => friend.id === suggestedFriend.id)
-  );
+  // Current friends list - initially showing first 6 friends
+  const [friends, setFriends] = useState<Friend[]>(allPossibleFriends.slice(0, 6));
+
+  // Suggested friends - calculated based on who is not in current friends
+  const [suggestedFriends, setSuggestedFriends] = useState<Friend[]>([]);
+
+  // Update suggested friends whenever the friends list changes
+  useEffect(() => {
+    const newSuggestedFriends = allPossibleFriends.filter(
+      possibleFriend => !friends.some(friend => friend.id === possibleFriend.id)
+    );
+    setSuggestedFriends(newSuggestedFriends);
+  }, [friends]);
 
   const handleRemoveFriend = (friendId: string) => {
     setFriends(friends.filter(friend => friend.id !== friendId));
+    // Note: We don't need to update suggestedFriends here as the useEffect will handle it
   };
 
   const handleAddFriend = (friendToAdd: Friend) => {
     setFriends([...friends, friendToAdd]);
     // Close modal if there are no more suggested friends
-    if (filteredSuggestedFriends.length === 1) {
+    if (suggestedFriends.length === 1) {
       setSuggestedFriendsModalVisible(false);
     }
   };
@@ -79,20 +85,21 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       await GoogleSignin.revokeAccess();
       await GoogleSignin.signOut();
       console.log("User successfully signed out");
+      setUser(null);
+      router.replace("/login");
     } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_REQUIRED || 
-          (error.message && error.message.includes("sign_in_required"))) {
+      if (error.code === statusCodes.SIGN_IN_REQUIRED ||
+        (error.message && error.message.includes("sign_in_required"))) {
         console.log("User not signed in, proceeding to clear state");
+        setUser(null);
+        router.replace("/login");
       } else {
         console.error("Error signing out:", error);
         Alert.alert("Sign Out Error", error.message || JSON.stringify(error));
-        return;
       }
-    } finally {
-      setUser(null);
-      router.replace("/login");
     }
   };
+
   return (
     <ScrollView style={styles.container}>
       <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.iconpic} />
@@ -104,25 +111,35 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Friends</Text>
-        <TouchableOpacity onPress={() => setSuggestedFriendsModalVisible(true)}>
-          <Image source={require('../assets/images/addfriend.png')} />
+        <TouchableOpacity
+          onPress={() => setSuggestedFriendsModalVisible(true)}
+          disabled={suggestedFriends.length === 0}
+        >
+          <Image
+            source={require('../assets/images/addfriend.png')}
+            style={suggestedFriends.length === 0 ? { opacity: 0.5 } : {}}
+          />
         </TouchableOpacity>
       </View>
       <View style={styles.friendsContainer}>
-        {friends.map((friend) => (
-          <View key={friend.id} style={styles.friendsCard}>
-          <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
-          <View style={{ flex: 1 }}>
-            <TouchableOpacity onPress={() => setSelectedFriend(friend)}>
-              <Text style={styles.friendName}>{friend.name}</Text>
-              <Text style={styles.friendText}>⭐ See their faves!</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveFriend(friend.id)}>
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </TouchableOpacity>
-        </View>
-        ))}
+        {friends.length > 0 ? (
+          friends.map((friend) => (
+            <View key={friend.id} style={styles.friendsCard}>
+              <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity onPress={() => setSelectedFriend(friend)}>
+                  <Text style={styles.friendName}>{friend.name}</Text>
+                  <Text style={styles.friendText}>❤️️ See their favorites!</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveFriend(friend.id)}>
+                <Text style={styles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noFriendsText}>You haven't added any friends yet</Text>
+        )}
       </View>
 
       <TouchableOpacity
@@ -131,7 +148,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       >
         <Text style={styles.buttonText}>Sign Out</Text>
       </TouchableOpacity>
-      
+
       {/* Friend Favorites Modal */}
       <Modal visible={!!selectedFriend} transparent animationType="slide">
         <View style={styles.modalContainer}>
@@ -152,13 +169,13 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Suggested Friends</Text>
-            
-            {filteredSuggestedFriends.length > 0 ? (
-              filteredSuggestedFriends.map((suggestedFriend) => (
+
+            {suggestedFriends.length > 0 ? (
+              suggestedFriends.map((suggestedFriend) => (
                 <View key={suggestedFriend.id} style={styles.suggestedFriendCard}>
-                  <Image 
-                    source={require('../assets/images/defaultprofilepic.png')} 
-                    style={styles.suggestedFriendIcon} 
+                  <Image
+                    source={require('../assets/images/defaultprofilepic.png')}
+                    style={styles.suggestedFriendIcon}
                   />
                   <View style={styles.suggestedFriendInfo}>
                     <Text style={styles.suggestedFriendName}>{suggestedFriend.name}</Text>
@@ -166,8 +183,8 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                       {suggestedFriend.recipes.length} favorite recipes
                     </Text>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.addButton} 
+                  <TouchableOpacity
+                    style={styles.addButton}
                     onPress={() => handleAddFriend(suggestedFriend)}
                   >
                     <Text style={styles.addButtonText}>Add</Text>
@@ -177,9 +194,9 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
             ) : (
               <Text style={styles.noFriendsText}>No more suggested friends available</Text>
             )}
-            
-            <TouchableOpacity 
-              style={[styles.closeButton, { marginTop: 20 }]} 
+
+            <TouchableOpacity
+              style={[styles.closeButton, { marginTop: 20 }]}
               onPress={() => setSuggestedFriendsModalVisible(false)}
             >
               <Text style={styles.closeButtonText}>Close</Text>
@@ -296,8 +313,8 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 5,
-    fontFamily: "MoulRegular",
-    // why is this not working???
+    // For custom font, make sure it's loaded properly with useFonts hook from expo-font
+    // fontFamily: "MoulRegular", 
   },
   username: {
     fontSize: 16,
@@ -408,6 +425,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     fontStyle: 'italic',
+    textAlign: 'center',
     marginVertical: 20,
   }
 });

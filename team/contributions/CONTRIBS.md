@@ -79,6 +79,8 @@ This document outlines the roles and contributions of each team member to the pr
 - Set up the **domain and DNS records**, allowing the site to be hosted at recipeai.live, and configured records to point to the GCP instance hosting the backend.
 - Set up and **networking infrastructure** via nginx, allowing the backend to communicate with the user's computer at recipeai.live.
 - Set up fast inference systems via CerebrasAI and GroqAI to enable accelerated LLM inference, and faster user response times.
+- Set up and refined **backend infrastructure**, ensuring smooth data flow and integration with other system components.  
+- Assisted in debugging and optimizing AI-based features to enhance accuracy and user experience.
 
 ---
 

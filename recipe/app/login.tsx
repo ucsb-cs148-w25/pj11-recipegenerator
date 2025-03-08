@@ -3,17 +3,21 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from
 import * as GoogleAuthSession from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
-import {GoogleSignin, GoogleSigninButton } from "@react-native-google-signin/google-signin";
+import { GoogleSignin, GoogleSigninButton } from "@react-native-google-signin/google-signin";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { jwtDecode } from "jwt-decode";
+
 
 WebBrowser.maybeCompleteAuthSession();
 
-const webClientId =
-  "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";
+const webClientId = "1075996537970-g1l2sfgkkg83k5llc8qlbc2ml7g8i2kr.apps.googleusercontent.com";  // from Google Console (Web type)
+const iosClientId = "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com";  // from Google Console (iOS type)
 
 export type User = {
-  token?: string;
-  serverAuthCode?: string;
+  token?: string;       // could be either idToken or accessToken
+  tokenType?: string;   // "idToken" or "accessToken"
+  userId?: string;
   guest?: boolean;
   name?: string;
   email?: string;
@@ -23,39 +27,46 @@ interface LoginProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
-const sendUserDataToBackend = async (user: { token?: string; serverAuthCode?: string; name?: string; email?: string }) => {
-  console.log("Sending user data to backend:", user);
-  console.log("User data payload (JSON):", JSON.stringify(user, null, 2));
-  
-  // try {
-  //   const response = await fetch("http://localhost:8000/", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify(user),
-  //   });
+
+const sendUserDataToBackend = async (user: User) => {
+  console.log("Sending user idToken to backend:", user);
+  try {
+    const response = await fetch("http://localhost:8000/google-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Backend returned status ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Backend response:", result);
+
+    const decoded: any = jwtDecode(result.token);
+    console.log("Decoded JWT:", decoded);
+
+    await AsyncStorage.setItem("token", result.token);
+    await AsyncStorage.setItem("userId", decoded.sub);
     
-  //   if (!response.ok) {
-  //     throw new Error(`Backend returned status ${response.status}`);
-  //   }
-    
-  //   const result = await response.json();
-  //   console.log("Backend response:", result);
-  //   return result;
-  // } catch (error) {
-  //   console.error("Error sending user data to backend:", error);
-  //   throw error;
-  // }
+    return result;
+  } catch (error) {
+    console.error("Error sending user data to backend:", error);
+    throw error;
+  }
 };
 
 export default function Login({ setUser }: LoginProps) {
   const navigation = useNavigation();
   const [error, setError] = useState<any>();
-  const [userInfo, setUserInfo] = useState<any>();
 
+  // For iOS/Android native config
   const configureGoogleSignin = () => {
     GoogleSignin.configure({
-      webClientId,
-      iosClientId: "1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep.apps.googleusercontent.com",
+      webClientId,     // optional for Android offline access
+      iosClientId,     // crucial for iOS native sign-in
       offlineAccess: true,
     });
   };
@@ -64,43 +75,43 @@ export default function Login({ setUser }: LoginProps) {
     configureGoogleSignin();
   }, []);
 
+
+// ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
     console.log("Pressed native sign in");
     try {
-      console.log("Checking for Google Play Services...");
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      console.log("Google Play Services are available.");
+      console.log("Attempting native (iOS/Android) Google sign in...");
 
-      console.log("Attempting native Google sign in...");
       const info = await GoogleSignin.signIn();
-      console.log("Native sign in success:", info);
+      console.log("Native sign in success, info from GoogleSignIn is:", info);
 
-      const result = info.data ? info.data : info;
+      const result = info.data;
       if (result && result.user) {
-        const userData = {
+        const userData: User = {
           token: result.idToken,
-          serverAuthCode: result.serverAuthCode,
+          tokenType: "idToken",
           name: result.user.name,
           email: result.user.email,
         };
-        setUserInfo(info);
-        setUser(userData);
 
-        await sendUserDataToBackend(userData);
+        setUser(userData);
+        const backendResponse = await sendUserDataToBackend(userData);
+
       } else {
-        console.error("No user information returned. Full info:", info);
-        Alert.alert("Sign In Error", "No user information returned from Google sign in");
+        console.error("No user info returned. Full info:", info);
+        Alert.alert("Sign In Error", "No user information returned from Google sign-in");
       }
     } catch (error: any) {
       console.error("Native sign in error:", error);
-      Alert.alert("Native sign in error", error.message || JSON.stringify(error));
+      Alert.alert("Native sign-in error", error.message || JSON.stringify(error));
       setError(error);
     }
   };
 
-  const redirectUri = makeRedirectUri({ useProxy: true });
-  console.log("Redirect URI:", redirectUri);
 
+  // ========== WEB SIGN-IN (Expo AuthSession) ==========
+  const redirectUri = makeRedirectUri({ useProxy: true });
   const [request, response, promptAsync] = GoogleAuthSession.useAuthRequest({
     clientId: webClientId,
     scopes: ["profile", "email"],
@@ -112,7 +123,8 @@ export default function Login({ setUser }: LoginProps) {
     if (response?.type === "success") {
       const { authentication } = response;
       if (authentication?.accessToken) {
-        fetchUserInfo(authentication.accessToken);
+        console.log("Got access token from Expo AuthSession:", authentication.accessToken);
+        handleAuthSession(authentication.accessToken);
       }
     } else if (response?.type === "error") {
       console.error("Expo AuthSession error", response.error);
@@ -120,26 +132,38 @@ export default function Login({ setUser }: LoginProps) {
     }
   }, [response]);
 
-  const fetchUserInfo = async (token: string) => {
+
+  const handleAuthSession = async (accessToken: string) => {
     try {
       const res = await fetch(
-        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`
+        `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
       );
       const user = await res.json();
       console.log("User info (Expo AuthSession):", user);
-      const userData = { token, name: user.name, email: user.email };
+      
+      const userData: User = {
+        token: accessToken,
+        tokenType: "accessToken",
+        name: user.name,
+        email: user.email,
+      };
       setUser(userData);
-      await sendUserDataToBackend(userData);
+
+      const backendResponse = await sendUserDataToBackend(userData);
+
+      setUser(userData);
     } catch (error) {
-      console.error("Failed to fetch user info", error);
+      console.error("Failed to authenticate user:", error);
     }
   };
 
+  // For guests
   const handleGuestLogin = () => {
     const guestUser = { guest: true, name: "Guest" };
     setUser(guestUser);
   };
 
+  // Decide which button to render
   const renderGoogleSignInButton = () => {
     if (Platform.OS === "web") {
       return (
@@ -148,7 +172,7 @@ export default function Login({ setUser }: LoginProps) {
           onPress={() => promptAsync({ useProxy: true })}
         >
           <Image source={require("./../assets/images/google-icon.png")} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Login with Google (AuthSession)</Text>
+          <Text style={styles.buttonText}>Login with Google (Web)</Text>
         </TouchableOpacity>
       );
     } else {
