@@ -1,0 +1,27 @@
+## Shiyuan Wang
+
+- **UI/UX Enhancements:**
+  - **Swipe-to-Delete Feature ([PR #146](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/146)):**
+    - Added a `SwipeableItem` component to handle swipe gestures and trigger item deletion.
+    - Updated the `FridgePage` component to use the new `SwipeableItem` component, including item deletion with undo functionality.
+    - Managed deletion timers and added animations for the undo toast.
+    - Minor updates in the `ProfilePage` component.
+  - **Enhanced UI with Better Delete UX and Undo Functionality ([PR #145](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/145)):**
+    - Moved the delete button to the right side to prevent accidental deletion.
+    - Added a 5-second undo delete toast notification with fade-out animation.
+    - Implemented a non-destructive delete pattern by delaying actual deletion.
+    - Improved overall layout and styling of ingredient items.
+  - **Update Package ([PR #135](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/135)):**
+    - General updates and improvements to the package.
+  - **Update the Name of the App ([PR #122](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/122)):**
+    - Changed the app’s display name to RecipeAI instead of StickSmash.
+  - **Update Favicon ([PR #87](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/87)):**
+    - Updated icons and the favicon for improved visual consistency.
+  - **Update USER_FEEDBACK_NEEDS.md ([PR #109](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/109)):**
+    - Updated the user feedback document.
+  - **Fix Favicon 500 Error ([PR #78](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/78)):**
+    - Updated the icon and favicon paths in `app.json`.
+  - **Signout Redirect ([PR #77](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/77)):**
+    - Made signout redirect the user to the login page.
+- **Design Contributions:**
+  - Designed desktop website mockups in Figma (note: these mockups were not implemented, as the project focus was on mobile/app development).
