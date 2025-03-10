@@ -1,4 +1,4 @@
-package com.jasoninthebox.StickerSmash
+package com.jasoninthebox.RecipeAI
 
 import android.app.Application
 import android.content.res.Configuration
