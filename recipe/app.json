@@ -23,6 +23,7 @@
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
+              "RecipeAI",
               "com.googleusercontent.apps.1075996537970-k52kpdt259g53acl1k31jf4f22uld8ep"
             ]
           }
@@ -30,11 +31,11 @@
       }
     },
     "android": {
+      "package": "com.jasoninthebox.RecipeAI",
       "adaptiveIcon": {
         "foregroundImage": "./assets/app_icon/android/res/mipmap-mdpi/ic_launcher_foreground.png",
         "backgroundImage": "./assets/app_icon/android/res/mipmap-hdpi/ic_launcher_background.png"
       },
-      "package": "com.jasoninthebox.RecipeAI",
       "intentFilters": [
         {
           "action": "VIEW",

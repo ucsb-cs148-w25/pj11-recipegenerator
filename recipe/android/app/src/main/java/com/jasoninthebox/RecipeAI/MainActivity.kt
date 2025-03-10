@@ -1,4 +1,4 @@
-package com.jasoninthebox.StickerSmash
+package com.jasoninthebox.RecipeAI
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

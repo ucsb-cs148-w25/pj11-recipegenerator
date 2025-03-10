@@ -16,9 +16,12 @@ interface Friend {
 }
 
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
+  // const [friends, setFriends] = useState<Friend[]>([]);
+  // const [suggestedFriends, setSuggestedFriends] = useState<Friend[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [suggestedFriendsModalVisible, setSuggestedFriendsModalVisible] = useState<boolean>(false);
 
+  const API_URL = "http://127.0.0.1:8000"; // update with real
   // All possible friends (both current and potential)
   const allPossibleFriends: Friend[] = [
     {
@@ -79,6 +82,71 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       setSuggestedFriendsModalVisible(false);
     }
   };
+
+
+
+  //code for friends when api is set up
+  // useEffect(() => {
+  //   if (user) fetchFriends();
+  // }, [user]);
+
+  // const fetchSuggestedFriends = async () => {
+  //   try {
+  //     const response = await fetch(`${API_URL}/suggested-friends/${user?.id}`);
+  //     const data = await response.json();
+  //     if (data.suggested_friends) setSuggestedFriends(data.suggested_friends);
+  //   } catch (error) {
+  //     console.error("Error fetching suggested friends:", error);
+  //   }
+  // };
+
+  // const fetchFriends = async () => {
+  //   try {
+  //     const response = await fetch(`${API_URL}/friends/${user?.id}`);
+  //     const data = await response.json();
+  //     if (data.friends) setFriends(data.friends);
+  //   } catch (error) {
+  //     console.error("Error fetching friends:", error);
+  //   }
+  // };
+  
+  // const handleAddFriend = async (friendId: string) => {
+  //   try {
+  //     const response = await fetch(`${API_URL}/friends/add`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ sender_id: user?.id, receiver_id: friendId }),
+  //     });
+  //     const data = await response.json();
+  //     if (data.message === "Friend added successfully") {
+  //       setFriends((prevFriends) => [...prevFriends, data.new_friend]);
+  //       setSuggestedFriends(suggestedFriends.filter(f => f.id !== friendId));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error adding friend:", error);
+  //   }
+  // };
+
+  // const handleRemoveFriend = async (friendId: string) => {
+  //   try {
+  //     const response = await fetch(`${API_URL}/friends/remove`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ sender_id: user?.id, receiver_id: friendId }),
+  //     });
+  //     const data = await response.json();
+  //     if (data.message === "Friend removed successfully") {
+  //       setFriends(friends.filter(friend => friend.id !== friendId));
+  //       fetchSuggestedFriends();
+  //     }
+  //   } catch (error) {
+  //     console.error("Error removing friend:", error);
+  //   }
+  // };
+
+
+
+
 
   const handleSignOut = async () => {
     try {
