@@ -65,7 +65,10 @@ export default function Homepage() {
             <View key={recipe.id} style={styles.recipeCard}>
               <View style={styles.header}>
                 <Text style={styles.recipeName}>{recipe.title}</Text>
-                <TouchableOpacity onPress={() => removeFavorite(recipe.title)}>
+                <TouchableOpacity 
+                  onPress={() => removeFavorite(recipe.title)}
+                  style={styles.favoriteButton}
+                >
                   <Image
                     source={require("../assets/images/favorited.png")}
                     style={styles.favoriteIcon}
@@ -89,6 +92,9 @@ const styles = StyleSheet.create({
   favoriteIcon: {
     width: 24,
     height: 24,
+  },
+  favoriteButton: {
+    padding: 5,
   },
   container: {
     flex: 1,
@@ -124,13 +130,17 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    width: '100%',
+    marginBottom: 5,
   },
   recipeName: {
     fontSize: 20,
     fontWeight: "600",
     color: "#088F8F",
-    marginBottom: 10,
+    flex: 1,
+    marginRight: 10,
   },
   notes: {
     fontSize: 14,
