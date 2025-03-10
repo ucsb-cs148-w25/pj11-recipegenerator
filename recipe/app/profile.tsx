@@ -1,4 +1,4 @@
-import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from "react-native";
+import { Image, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from "react-native";
 import { router } from 'expo-router';
 import { useState, useEffect } from "react";
 import { User } from './login';
@@ -13,11 +13,13 @@ interface Friend {
   id: string;
   name: string;
   recipes: string[];
+  email?: string; // optional email property
 }
 
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [suggestedFriendsModalVisible, setSuggestedFriendsModalVisible] = useState<boolean>(false);
+  const [emailInput, setEmailInput] = useState<string>(''); // Track email input
 
   // All possible friends (both current and potential)
   const allPossibleFriends: Friend[] = [
@@ -80,6 +82,19 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   };
 
+  const handleAddFriendByEmail = () => {
+    // Logic to handle adding a friend by email
+    const friend = allPossibleFriends.find(f => f.email === emailInput);
+    if (friend) {
+      handleAddFriend(friend);
+      setEmailInput(''); // Reset email input after adding
+    } else {
+      Alert.alert('Friend not found', 'No friend with this email exists.');
+    }
+  };
+
+
+
   const handleSignOut = async () => {
     try {
       await GoogleSignin.revokeAccess();
@@ -113,11 +128,9 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         <Text style={styles.sectionTitle}>Friends</Text>
         <TouchableOpacity
           onPress={() => setSuggestedFriendsModalVisible(true)}
-          disabled={suggestedFriends.length === 0}
         >
           <Image
             source={require('../assets/images/addfriend.png')}
-            style={suggestedFriends.length === 0 ? { opacity: 0.5 } : {}}
           />
         </TouchableOpacity>
       </View>
@@ -194,6 +207,20 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
             ) : (
               <Text style={styles.noFriendsText}>No more suggested friends available</Text>
             )}
+
+            {/* Email Add Friend Section */}
+            <TextInput
+              style={styles.emailInput}
+              placeholder="Enter friend's email"
+              value={emailInput}
+              onChangeText={setEmailInput}
+            />
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddFriendByEmail}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.closeButton, { marginTop: 20 }]}
@@ -427,5 +454,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginVertical: 20,
-  }
+  },
+  emailInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 15,
+    width: '100%',
+  },
 });
