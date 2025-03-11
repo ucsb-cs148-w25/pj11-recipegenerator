@@ -39,7 +39,8 @@ from app.models import (
     GenerateRecipesResponse,
     ImageRecipeResponse,
     FavoriteRecipe,
-    RemoveFavoriteRequest
+    RemoveFavoriteRequest,
+    RecipePreferences
 )
 
 # MongoDB URI
@@ -226,11 +227,11 @@ def generate_suggestions(user_id: str = Depends(get_current_user)):
 
     return GenerateSuggestionsResponse(suggestions=suggestions)
 
-@app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
-def generate_recipes(user_id: str = Depends(get_current_user)):
+@app.post("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
+def generate_recipes(preferences: RecipePreferences, user_id: str = Depends(get_current_user)):
     """
-    Generate three recipe suggestions based on current fridge contents using an ML function.
-    Response is enforced by GenerateRecipesResponse, returning structured JSON.
+    Generate three recipe suggestions based on current fridge contents and user preferences 
+    using an ML function. Response is enforced by GenerateRecipesResponse, returning structured JSON.
     
     Raises a 400 error if the fridge is empty, or a 500 error if recipe generation fails.
     """
@@ -244,14 +245,29 @@ def generate_recipes(user_id: str = Depends(get_current_user)):
             detail="The fridge is empty! Please add some ingredients first."
         )
     try:
-        # This function now needs to return a dictionary with recipe1, recipe2, recipe3 keys
-        recipes_dict = generate_delicious_recipes(fridge_contents)
+        # Convert preferences from Pydantic model to dict
+        preferences_dict = preferences.dict() if preferences else {}
+        
+        # Pass both fridge contents and preferences to the recipe generator
+        recipes_dict = generate_delicious_recipes(fridge_contents, preferences_dict)
         return recipes_dict
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error generating recipes: {str(e)}"
         )
+
+@app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
+def generate_recipes_get(user_id: str = Depends(get_current_user)):
+    """
+    Legacy GET endpoint for backward compatibility.
+    Generate three recipe suggestions based on current fridge contents using an ML function.
+    This endpoint doesn't accept preferences and is maintained for backward compatibility.
+    """
+    # Create empty preferences
+    empty_preferences = RecipePreferences()
+    # Call the POST version with empty preferences
+    return generate_recipes(empty_preferences, user_id)
 
 @app.post("/fridge/load_from_image", response_model=ImageRecipeResponse)
 async def convert_image_to_recipes(image_file: UploadFile = File(...)):

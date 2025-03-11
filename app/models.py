@@ -84,6 +84,17 @@ class GenerateRecipesResponse(BaseModel):
     recipe3: dict = Field(..., description="Third recipe with name, ingredients, and steps")
 
 
+class RecipePreferences(BaseModel):
+    """
+    Model for user preferences when generating recipes.
+    These preferences help customize the recipe recommendations.
+    """
+    isVegan: bool = Field(False, description="Whether the user prefers vegan recipes")
+    isSpicy: bool = Field(False, description="Whether the user prefers spicy recipes")
+    cuisines: List[str] = Field([], description="List of preferred cuisines")
+    allergens: List[str] = Field([], description="List of allergens to avoid")
+
+
 class ImageRecipeResponse(BaseModel):
     """
     Model for the response returned by the /fridge/load_from_image endpoint.

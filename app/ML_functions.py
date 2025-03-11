@@ -28,11 +28,11 @@ from dotenv import load_dotenv  # Add this import for loading .env file
 # Load environment variables from .env file
 load_dotenv()  # This will load all variables from .env into os.environ
 
-def generate_delicious_recipes(ingredients_list):
+def generate_delicious_recipes(ingredients_list, preferences=None):
 
     """
     This function uses OpenAI's '4o mini model' to generate a list of three 
-    delicious recipes based on the user's ingredient list.
+    delicious recipes based on the user's ingredient list and preferences.
 
     The function expects a list of tuples with each tuple being of the form:
     (ingredient_name: str, quantity: int).
@@ -48,6 +48,8 @@ def generate_delicious_recipes(ingredients_list):
 
     :param ingredients_list: A list of tuples. Each tuple includes a string 
                             (ingredient name) and an integer (quantity).
+    :param preferences: Optional dictionary containing user preferences for recipes.
+                        Can include 'isVegan', 'isSpicy', 'cuisines', and 'allergens'.
     :return: A dictionary containing three recipe objects if function call 
              is successful. Otherwise, a fallback string of the response.
     """
@@ -75,10 +77,34 @@ def generate_delicious_recipes(ingredients_list):
         f"{ingredient} ({quantity})" for ingredient, quantity in ingredients_list
     ])
 
-    # --- Step 3: Construct the user prompt to request recipes --- #
+    # --- Step 3: Format user preferences --- #
+    preferences_text = ""
+    if preferences:
+        if preferences.get('isVegan', False):
+            preferences_text += "- User prefers VEGAN recipes only.\n"
+        
+        if preferences.get('isSpicy', False):
+            preferences_text += "- User prefers SPICY recipes.\n"
+        
+        if preferences.get('cuisines') and len(preferences.get('cuisines')) > 0:
+            cuisines_list = ", ".join(preferences.get('cuisines'))
+            preferences_text += f"- User prefers these cuisines: {cuisines_list}.\n"
+        
+        if preferences.get('allergens') and len(preferences.get('allergens')) > 0:
+            allergens_list = ", ".join(preferences.get('allergens'))
+            preferences_text += f"- User CANNOT have these allergens: {allergens_list}. DO NOT include these in any recipes.\n"
+
+    # --- Step 4: Construct the user prompt to request recipes --- #
     prompt_text = (
         "You are a recipe creator. The user has the following ingredients in their freezer:\n"
         f"{formatted_ingredients}\n"
+    )
+    
+    # Add user preferences if they exist
+    if preferences_text:
+        prompt_text += f"\nUSER PREFERENCES (IMPORTANT):\n{preferences_text}\n"
+    
+    prompt_text += (
         "Propose a list of three delicious recipes that could be made from these ingredients. "
         "It is not mandatory to use all ingredients. For each recipe, give a short name, the ingredients required (should only include ingredients that the user has in their freezer) and a detailed, step by step recipe.\n\n"
         """Here is an example recipe:\n"
@@ -181,7 +207,7 @@ def generate_delicious_recipes(ingredients_list):
         }
     ]
 
-    # --- Step 4: Make the API call to OpenAI with function calling --- #
+    # --- Step 5: Make the API call to OpenAI with function calling --- #
     try:
         client = OpenAI(base_url="https://api.groq.com/openai/v1",
         api_key=os.getenv("GROQ_API_KEY")
@@ -201,7 +227,7 @@ def generate_delicious_recipes(ingredients_list):
     except Exception as e:
         raise RuntimeError(f"OpenAI API call failed: {e}")
 
-    # --- Step 5: Retrieve and parse the function call from the response --- #
+    # --- Step 6: Retrieve and parse the function call from the response --- #
     try:
         # Fetch the role to check if the assistant has called the function
         role = response.choices[0].message.role
