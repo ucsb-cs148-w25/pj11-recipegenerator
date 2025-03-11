@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Image,
+  Animated,
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { apiRequest } from "./api";
@@ -15,6 +16,11 @@ export default function Homepage() {
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const isFocused = useIsFocused();
+  // States for undo functionality
+  const [removingRecipe, setRemovingRecipe] = useState(null);
+  const [showUndo, setShowUndo] = useState(false);
+  const undoTimeout = useRef(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const fetchSavedRecipes = async () => {
     try {
@@ -35,18 +41,80 @@ export default function Homepage() {
     }
   }, [isFocused]);
 
-  const removeFavorite = async (title) => {
+  // Animation for the undo popup
+  useEffect(() => {
+    if (showUndo) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showUndo, fadeAnim]);
+
+  // Clean up timeout when component unmounts
+  useEffect(() => {
+    return () => {
+      if (undoTimeout.current) {
+        clearTimeout(undoTimeout.current);
+      }
+    };
+  }, []);
+
+  const startRemoveFavorite = (recipe) => {
+    // Save the recipe being removed
+    setRemovingRecipe(recipe);
+    setShowUndo(true);
+
+    // Set a timeout to actually remove if undo is not clicked
+    if (undoTimeout.current) {
+      clearTimeout(undoTimeout.current);
+    }
+
+    undoTimeout.current = setTimeout(() => {
+      finalizeRemoveFavorite(recipe.title);
+      setShowUndo(false);
+      setRemovingRecipe(null);
+    }, 3000); // 3 seconds to undo
+
+    // Immediately update UI (optimistic update)
+    setSavedRecipes((prevRecipes) =>
+      prevRecipes.filter(
+        (r) =>
+          r.title.trim().toLowerCase() !== recipe.title.trim().toLowerCase()
+      )
+    );
+  };
+
+  const undoRemove = () => {
+    // Cancel the timeout
+    if (undoTimeout.current) {
+      clearTimeout(undoTimeout.current);
+    }
+
+    // Add the recipe back to the list
+    if (removingRecipe) {
+      setSavedRecipes((prevRecipes) => [removingRecipe, ...prevRecipes]);
+    }
+
+    setShowUndo(false);
+    setRemovingRecipe(null);
+  };
+
+  const finalizeRemoveFavorite = async (title) => {
     try {
       await apiRequest("/fridge/remove_favorite_recipe", "POST", { title });
-      // Remove instantly from the UI (normalize title to avoid mismatch).
-      setSavedRecipes((prevRecipes) =>
-        prevRecipes.filter(
-          (recipe) =>
-            recipe.title.trim().toLowerCase() !== title.trim().toLowerCase()
-        )
-      );
+      console.log("Recipe removed from favorites:", title);
     } catch (error) {
       console.error("Error removing favorite recipe:", error);
+      // If API call fails, fetch fresh data
+      fetchSavedRecipes();
     }
   };
 
@@ -65,8 +133,8 @@ export default function Homepage() {
             <View key={recipe.id} style={styles.recipeCard}>
               <View style={styles.header}>
                 <Text style={styles.recipeName}>{recipe.title}</Text>
-                <TouchableOpacity 
-                  onPress={() => removeFavorite(recipe.title)}
+                <TouchableOpacity
+                  onPress={() => startRemoveFavorite(recipe)}
                   style={styles.favoriteButton}
                 >
                   <Image
@@ -83,6 +151,31 @@ export default function Homepage() {
         </ScrollView>
       ) : (
         <Text style={styles.noRecipes}>No saved recipes yet.</Text>
+      )}
+
+      {/* Undo popup */}
+      {showUndo && (
+        <Animated.View
+          style={[
+            styles.undoContainer,
+            {
+              opacity: fadeAnim,
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.undoText}>Recipe removed from favorites</Text>
+          <TouchableOpacity onPress={undoRemove} style={styles.undoButton}>
+            <Text style={styles.undoButtonText}>UNDO</Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );
@@ -132,7 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    width: '100%',
+    width: "100%",
     marginBottom: 5,
   },
   recipeName: {
@@ -153,5 +246,38 @@ const styles = StyleSheet.create({
     color: "#888",
     textAlign: "center",
     marginTop: 20,
+  },
+  // Undo popup styles
+  undoContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(51, 51, 51, 0.9)",
+    borderRadius: 10,
+    padding: 15,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  undoText: {
+    color: "white",
+    fontSize: 16,
+    flex: 1,
+  },
+  undoButton: {
+    marginLeft: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  undoButtonText: {
+    color: "#4ECDC4",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
