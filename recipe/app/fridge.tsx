@@ -50,6 +50,38 @@ enum TutorialStep {
   Completed = 5,
 }
 
+// Define sort types with direction built in
+enum SortType {
+  None = "none",
+  NameAZ = "name_az",
+  NameZA = "name_za",
+  QuantityLowHigh = "quantity_low_high",
+  QuantityHighLow = "quantity_high_low",
+}
+
+// Define sort option interface for dropdown
+interface SortOption {
+  label: string;
+  value: SortType;
+  icon: string; // Using string type to accommodate all icon names
+}
+
+const sortOptions: SortOption[] = [
+  { label: "Sort by...", value: SortType.None, icon: "sort" },
+  { label: "Name (A to Z)", value: SortType.NameAZ, icon: "sort-alpha-asc" },
+  { label: "Name (Z to A)", value: SortType.NameZA, icon: "sort-alpha-desc" },
+  {
+    label: "Quantity (Low to High)",
+    value: SortType.QuantityLowHigh,
+    icon: "sort-amount-asc",
+  },
+  {
+    label: "Quantity (High to Low)",
+    value: SortType.QuantityHighLow,
+    icon: "sort-amount-desc",
+  },
+];
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function FridgePage() {
@@ -75,6 +107,11 @@ function FridgePage() {
   );
   const [showTutorialTooltip, setShowTutorialTooltip] = useState(false);
   const tooltipAnim = useRef(new Animated.Value(0)).current;
+
+  // Sorting state
+  const [sortType, setSortType] = useState<SortType>(SortType.None);
+  // New dropdown state
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -659,13 +696,120 @@ function FridgePage() {
     );
   };
 
+  // Update the sorting function to work with the new sort types
+  const sortItems = (items: FridgeItem[]): FridgeItem[] => {
+    if (sortType === SortType.None) return items;
+
+    const sortedItems = [...items];
+
+    switch (sortType) {
+      case SortType.NameAZ:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        break;
+
+      case SortType.NameZA:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameB.localeCompare(nameA);
+        });
+        break;
+
+      case SortType.QuantityLowHigh:
+        sortedItems.sort((a, b) => a.quantity - b.quantity);
+        break;
+
+      case SortType.QuantityHighLow:
+        sortedItems.sort((a, b) => b.quantity - a.quantity);
+        break;
+    }
+
+    return sortedItems;
+  };
+
+  // Get the active sort option
+  const getActiveSortOption = (): SortOption => {
+    return (
+      sortOptions.find((option) => option.value === sortType) || sortOptions[0]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
 
-      {/* Custom swipe-to-delete list */}
+      {/* Sorting Controls - Dropdown Style */}
+      <View style={styles.sortControlsContainer}>
+        <TouchableOpacity
+          style={styles.sortDropdownButton}
+          onPress={() => setShowSortDropdown(true)}
+        >
+          <FontAwesome
+            name={getActiveSortOption().icon as any}
+            size={16}
+            color="#088F8F"
+            style={styles.sortIcon}
+          />
+          <Text style={styles.sortDropdownText}>
+            {getActiveSortOption().label}
+          </Text>
+          <FontAwesome name="chevron-down" size={12} color="#088F8F" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sort Options Dropdown Modal */}
+      <Modal
+        visible={showSortDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSortDropdown(false)}
+      >
+        <TouchableOpacity
+          style={styles.sortDropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSortDropdown(false)}
+        >
+          <View style={styles.sortDropdownMenu}>
+            {sortOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.sortDropdownItem,
+                  sortType === option.value && styles.sortDropdownItemActive,
+                ]}
+                onPress={() => {
+                  setSortType(option.value);
+                  setShowSortDropdown(false);
+                }}
+              >
+                <FontAwesome
+                  name={option.icon as any}
+                  size={16}
+                  color={sortType === option.value ? "#FFFFFF" : "#088F8F"}
+                  style={styles.sortIcon}
+                />
+                <Text
+                  style={[
+                    styles.sortDropdownItemText,
+                    sortType === option.value &&
+                      styles.sortDropdownItemTextActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Custom swipe-to-delete list with sorted items */}
       <FlatList
-        data={items}
+        data={sortItems(items)}
         keyExtractor={(item) => item.id || item.name}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 120 }}
@@ -819,10 +963,15 @@ function FridgePage() {
 
       {/* Tutorial interaction hint */}
       {tutorialActive && (
-        <View style={[styles.interactionHintContainer, { opacity: 0.8, transform: [{ translateY: -5 }] }]}>
+        <View
+          style={[
+            styles.interactionHintContainer,
+            { opacity: 0.8, transform: [{ translateY: -5 }] },
+          ]}
+        >
           <Text style={styles.interactionHintText}>
-            <FontAwesome name="hand-pointer-o" size={14} color="#088F8F" />
-            {" "}Interact with the app during the tutorial!
+            <FontAwesome name="hand-pointer-o" size={14} color="#088F8F" />{" "}
+            Interact with the app during the tutorial!
           </Text>
         </View>
       )}
@@ -1171,6 +1320,79 @@ const styles = StyleSheet.create({
   actionText: {
     fontWeight: "bold",
     color: "#088F8F",
+  },
+  /* Sorting Styles */
+  sortControlsContainer: {
+    flexDirection: "row",
+    marginBottom: 15,
+    justifyContent: "flex-end",
+    paddingRight: 5,
+  },
+  sortDropdownButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#088F8F",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    minWidth: 150,
+    maxWidth: 200,
+    justifyContent: "space-between",
+  },
+  sortDropdownText: {
+    fontSize: 14,
+    color: "#088F8F",
+    fontWeight: "500",
+    marginRight: 8,
+    flex: 1,
+    textAlign: "left",
+  },
+  sortIcon: {
+    marginRight: 8,
+  },
+  sortDropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sortDropdownMenu: {
+    backgroundColor: "#FFF",
+    borderRadius: 10,
+    padding: 5,
+    width: "80%",
+    maxWidth: 300,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  sortDropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 6,
+    marginVertical: 2,
+  },
+  sortDropdownItemActive: {
+    backgroundColor: "#088F8F",
+  },
+  sortDropdownItemText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  sortDropdownItemTextActive: {
+    color: "#FFF",
+    fontWeight: "bold",
   },
 });
 
