@@ -5,6 +5,7 @@ import {
     PanResponder,
     StyleSheet,
     Dimensions,
+    TouchableOpacity,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -20,12 +21,18 @@ type SwipeableItemProps = {
     children: React.ReactNode;
     onDelete: () => void; // callback for deletion
     borderRadius?: number; // Allow customizing border radius
+    selectMode?: boolean; // Whether the component is in batch selection mode
+    selected?: boolean; // Whether this item is selected in batch mode
+    onToggleSelect?: () => void; // Callback for toggling selection
 };
 
 export default function SwipeableItem({
     children,
     onDelete,
-    borderRadius = 10
+    borderRadius = 10,
+    selectMode = false,
+    selected = false,
+    onToggleSelect = () => { }
 }: SwipeableItemProps) {
     const translateX = useRef(new Animated.Value(0)).current;
     const lastOffset = useRef(0);
@@ -37,12 +44,12 @@ export default function SwipeableItem({
         extrapolate: 'clamp',
     });
 
-    // PanResponder to handle gestures
+    // PanResponder to handle gestures - only active when not in select mode
     const panResponder = useRef(
         PanResponder.create({
-            // Start the gesture if user moves horizontally
+            // Start the gesture if user moves horizontally and not in select mode
             onMoveShouldSetPanResponder: (_, gestureState) => {
-                return Math.abs(gestureState.dx) > 5;
+                return !selectMode && Math.abs(gestureState.dx) > 5;
             },
             // Tracking the finger movement
             onPanResponderMove: (_, gestureState) => {
@@ -103,11 +110,38 @@ export default function SwipeableItem({
             <Animated.View
                 style={[
                     styles.foreground,
-                    { transform: [{ translateX }], borderRadius }
+                    { transform: [{ translateX }], borderRadius },
+                    selectMode && selected && styles.selectedItem
                 ]}
-                {...panResponder.panHandlers}
+                {...(selectMode ? {} : panResponder.panHandlers)}
             >
-                {children}
+                {/* Selection checkbox in select mode */}
+                {selectMode && (
+                    <TouchableOpacity
+                        style={styles.checkboxContainer}
+                        onPress={onToggleSelect}
+                        activeOpacity={0.7}
+                    >
+                        <FontAwesome
+                            name={selected ? "check-square-o" : "square-o"}
+                            size={22}
+                            color="#088F8F"
+                        />
+                    </TouchableOpacity>
+                )}
+
+                {/* Wrap children in TouchableOpacity when in select mode */}
+                {selectMode ? (
+                    <TouchableOpacity
+                        style={styles.childrenContainer}
+                        onPress={onToggleSelect}
+                        activeOpacity={0.7}
+                    >
+                        {children}
+                    </TouchableOpacity>
+                ) : (
+                    children
+                )}
             </Animated.View>
         </View>
     );
@@ -143,5 +177,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    selectedItem: {
+        backgroundColor: '#E6F7F2', // Light green background for selected items
+        borderWidth: 1,
+        borderColor: '#088F8F',
+    },
+    checkboxContainer: {
+        marginRight: 15,
+    },
+    childrenContainer: {
+        flex: 1,
+        flexDirection: 'row',
     },
 });
