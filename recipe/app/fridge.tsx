@@ -529,7 +529,7 @@ function FridgePage() {
   // Render each item using our custom swipeable row.
   const renderItem = ({ item }: { item: FridgeItem }) => {
     return (
-      <SwipeableItem onDelete={() => deleteItem(item)} borderRadius={10}>
+      <SwipeableItem onDelete={() => deleteItem(item)} borderRadius={20}>
         <View style={styles.ingredientItem}>
           <Text style={styles.ingredientText}>{item.name}</Text>
           <View style={styles.quantityControls}>
@@ -747,6 +747,23 @@ function FridgePage() {
     <View style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
 
+      {/* Add Search Bar */}
+      <View style={styles.searchContainer}>
+        <FontAwesome name="search" size={16} color="#088F8F" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search ingredients..."
+          placeholderTextColor="#AAAAAA"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          clearButtonMode="while-editing"
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <FontAwesome name="times-circle" size={16} color="#088F8F" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {/* Sorting Controls - Dropdown Style */}
       <View style={styles.sortControlsContainer}>
         <TouchableOpacity
@@ -766,23 +783,7 @@ function FridgePage() {
         </TouchableOpacity>
       </View>
 
-      {/* Add Search Bar */}
-      <View style={styles.searchContainer}>
-        <FontAwesome name="search" size={16} color="#088F8F" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search ingredients..."
-          placeholderTextColor="#AAAAAA"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          clearButtonMode="while-editing"
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <FontAwesome name="times-circle" size={16} color="#088F8F" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+
 
       {/* Sort Options Dropdown Modal */}
       <Modal
@@ -835,7 +836,8 @@ function FridgePage() {
         data={filterItems(sortItems(items))}
         keyExtractor={(item) => item.id || item.name}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 120 , paddingHorizontal: 5}}
+
       />
 
       {/* Floating Add Ingredient Section */}

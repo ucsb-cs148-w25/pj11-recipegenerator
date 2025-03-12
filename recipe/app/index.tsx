@@ -12,25 +12,50 @@ import {
 import { useIsFocused } from "@react-navigation/native";
 import { apiRequest } from "./api";
 
+// Define types for our recipe data
+interface Recipe {
+  id?: string;
+  title: string;
+  description?: string;
+}
+
 export default function Homepage() {
-  const [savedRecipes, setSavedRecipes] = useState([]);
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const isFocused = useIsFocused();
   // States for undo functionality
-  const [removingRecipe, setRemovingRecipe] = useState(null);
+  const [removingRecipe, setRemovingRecipe] = useState<Recipe | null>(null);
   const [showUndo, setShowUndo] = useState(false);
-  const undoTimeout = useRef(null);
+  const undoTimeout = useRef<NodeJS.Timeout | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // State to track expanded/collapsed state of each recipe
+  const [expandedRecipes, setExpandedRecipes] = useState<Record<string, boolean>>({});
 
   const fetchSavedRecipes = async () => {
     try {
       const data = await apiRequest("/fridge/get_favorite_recipes");
       setSavedRecipes(data);
+
+      // Initialize all recipes as expanded
+      const initialExpandState: Record<string, boolean> = {};
+      data.forEach((recipe: Recipe) => {
+        initialExpandState[recipe.id || recipe.title] = true;
+      });
+      setExpandedRecipes(initialExpandState);
     } catch (error) {
       console.error("Error fetching saved recipes:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Toggle recipe expansion
+  const toggleRecipeExpansion = (recipeId: string) => {
+    setExpandedRecipes(prev => ({
+      ...prev,
+      [recipeId]: !prev[recipeId]
+    }));
   };
 
   useEffect(() => {
@@ -67,7 +92,7 @@ export default function Homepage() {
     };
   }, []);
 
-  const startRemoveFavorite = (recipe) => {
+  const startRemoveFavorite = (recipe: Recipe) => {
     // Save the recipe being removed
     setRemovingRecipe(recipe);
     setShowUndo(true);
@@ -81,7 +106,7 @@ export default function Homepage() {
       finalizeRemoveFavorite(recipe.title);
       setShowUndo(false);
       setRemovingRecipe(null);
-    }, 3000); // 3 seconds to undo
+    }, 3000) as NodeJS.Timeout; // 3 seconds to undo
 
     // Immediately update UI (optimistic update)
     setSavedRecipes((prevRecipes) =>
@@ -101,15 +126,21 @@ export default function Homepage() {
     // Add the recipe back to the list
     if (removingRecipe) {
       setSavedRecipes((prevRecipes) => [removingRecipe, ...prevRecipes]);
+
+      // Make sure the expanded state is set
+      setExpandedRecipes(prev => ({
+        ...prev,
+        [removingRecipe.id || removingRecipe.title]: true
+      }));
     }
 
     setShowUndo(false);
     setRemovingRecipe(null);
   };
 
-  const finalizeRemoveFavorite = async (title) => {
+  const finalizeRemoveFavorite = async (title: string) => {
     try {
-      await apiRequest("/fridge/remove_favorite_recipe", "POST", { title });
+      await apiRequest("/fridge/remove_favorite_recipe", "POST", { title } as any);
       console.log("Recipe removed from favorites:", title);
     } catch (error) {
       console.error("Error removing favorite recipe:", error);
@@ -129,25 +160,53 @@ export default function Homepage() {
         <ActivityIndicator size="large" color="#088F8F" />
       ) : savedRecipes.length > 0 ? (
         <ScrollView style={styles.historyContainer}>
-          {savedRecipes.map((recipe) => (
-            <View key={recipe.id} style={styles.recipeCard}>
-              <View style={styles.header}>
-                <Text style={styles.recipeName}>{recipe.title}</Text>
-                <TouchableOpacity
-                  onPress={() => startRemoveFavorite(recipe)}
-                  style={styles.favoriteButton}
-                >
-                  <Image
-                    source={require("../assets/images/favorited.png")}
-                    style={styles.favoriteIcon}
-                  />
-                </TouchableOpacity>
+          {savedRecipes.map((recipe) => {
+            const recipeId = recipe.id || recipe.title;
+            const isExpanded = expandedRecipes[recipeId] ?? true; // Default to expanded if state not found
+
+            return (
+              <View key={recipeId} style={styles.recipeCard}>
+                <View style={styles.header}>
+                  <TouchableOpacity
+                    onPress={() => startRemoveFavorite(recipe)}
+                    style={styles.favoriteButton}
+                  >
+                    <Image
+                      source={require("../assets/images/favorited.png")}
+                      style={styles.favoriteIcon}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.recipeTitleContainer}
+                    onPress={() => toggleRecipeExpansion(recipeId)}
+                  >
+                    <Text style={styles.recipeName}>{recipe.title}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.headerButtons}>
+
+                    <TouchableOpacity
+                      onPress={() => toggleRecipeExpansion(recipeId)}
+                      style={styles.toggleButton}
+                    >
+                      <Image
+                        source={
+                          isExpanded
+                            ? require("../assets/images/toggleup.png")
+                            : require("../assets/images/toggledown.png")
+                        }
+                        style={styles.toggleIcon}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {isExpanded && (
+                  <Text style={styles.notes}>
+                    {recipe.description || "No description available."}
+                  </Text>
+                )}
               </View>
-              <Text style={styles.notes}>
-                {recipe.description || "No description available."}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       ) : (
         <Text style={styles.noRecipes}>No saved recipes yet.</Text>
@@ -183,11 +242,28 @@ export default function Homepage() {
 
 const styles = StyleSheet.create({
   favoriteIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
+    marginRight: 5,
+    marginTop: 5,
   },
   favoriteButton: {
     padding: 5,
+  },
+  toggleIcon: {
+    width: 20,
+    height: 18,
+  },
+  toggleButton: {
+    padding: 5,
+    marginRight: 5,
+  },
+  recipeTitleContainer: {
+    flex: 1,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   container: {
     flex: 1,
@@ -212,9 +288,10 @@ const styles = StyleSheet.create({
   },
   recipeCard: {
     backgroundColor: "white",
-    borderRadius: 15,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 15,
+    marginHorizontal: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -240,6 +317,7 @@ const styles = StyleSheet.create({
     color: "#666",
     fontStyle: "italic",
     lineHeight: 20,
+    marginTop: 8,
   },
   noRecipes: {
     fontSize: 18,
