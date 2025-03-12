@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState, useEffect } from "react";
 import { User } from './login';
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfilePageProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -93,25 +94,36 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   };
 
-
-
   const handleSignOut = async () => {
     try {
-      await GoogleSignin.revokeAccess();
-      await GoogleSignin.signOut();
-      console.log("User successfully signed out");
+      // Clean up AsyncStorage
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("userId");
+      await AsyncStorage.removeItem("isGuest");
+
+      // Reset tutorial state for the next user
+      await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+
+      // If not a guest user, also revoke Google access
+      if (!user?.guest) {
+        try {
+          await GoogleSignin.revokeAccess();
+          await GoogleSignin.signOut();
+          console.log("Google user successfully signed out");
+        } catch (googleError: any) {
+          console.log("Error with Google sign out, proceeding anyway:", googleError);
+        }
+      } else {
+        console.log("Guest user signed out");
+      }
+
       setUser(null);
       router.replace("/login");
     } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_REQUIRED ||
-        (error.message && error.message.includes("sign_in_required"))) {
-        console.log("User not signed in, proceeding to clear state");
-        setUser(null);
-        router.replace("/login");
-      } else {
-        console.error("Error signing out:", error);
-        Alert.alert("Sign Out Error", error.message || JSON.stringify(error));
-      }
+      console.error("Error signing out:", error);
+      // Even if there's an error, try to reset the user state
+      setUser(null);
+      router.replace("/login");
     }
   };
 
