@@ -50,7 +50,7 @@ const sendUserDataToBackend = async (user: User) => {
 
     await AsyncStorage.setItem("token", result.token);
     await AsyncStorage.setItem("userId", decoded.sub);
-    
+
     return result;
   } catch (error) {
     console.error("Error sending user data to backend:", error);
@@ -76,10 +76,14 @@ export default function Login({ setUser }: LoginProps) {
   }, []);
 
 
-// ========== NATIVE SIGN-IN (iOS/Android) ==========
+  // ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
     console.log("Pressed native sign in");
     try {
+      // Clear any previous user data
+      await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+      await AsyncStorage.removeItem("isGuest");
+
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       console.log("Attempting native (iOS/Android) Google sign in...");
 
@@ -135,12 +139,16 @@ export default function Login({ setUser }: LoginProps) {
 
   const handleAuthSession = async (accessToken: string) => {
     try {
+      // Clear any previous user data including tutorial states
+      await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+      await AsyncStorage.removeItem("isGuest");
+
       const res = await fetch(
         `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
       );
       const user = await res.json();
       console.log("User info (Expo AuthSession):", user);
-      
+
       const userData: User = {
         token: accessToken,
         tokenType: "accessToken",
@@ -158,9 +166,20 @@ export default function Login({ setUser }: LoginProps) {
   };
 
   // For guests
-  const handleGuestLogin = () => {
+  const handleGuestLogin = async () => {
+    // Clear any existing Google user tokens to prevent data leakage
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("userId");
+
+    // Reset tutorial state for new users
+    await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+
+    // Create a temporary guest user without authentication tokens
     const guestUser = { guest: true, name: "Guest" };
     setUser(guestUser);
+
+    // Set guest flag to ensure API requests don't use any existing tokens
+    await AsyncStorage.setItem("isGuest", "true");
   };
 
   // Decide which button to render
