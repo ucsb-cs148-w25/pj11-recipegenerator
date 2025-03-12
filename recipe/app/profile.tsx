@@ -16,80 +16,124 @@ interface Friend {
   email?: string; // optional email property
 }
 
+const API_URL = "http://localhost:8000"
+
 export default function ProfilePage({ setUser, user }: ProfilePageProps) {
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [emailInput, setEmailInput] = useState<string>('');
+
   const [suggestedFriendsModalVisible, setSuggestedFriendsModalVisible] = useState<boolean>(false);
-  const [emailInput, setEmailInput] = useState<string>(''); // Track email input
-
-  // All possible friends (both current and potential)
-  const allPossibleFriends: Friend[] = [
-    {
-      id: '1',
-      name: 'Chappell Roan',
-      recipes: ['Spaghetti Carbonara', 'Avocado Toast', 'Blueberry Pancakes', 'Iced Latte']
-    },
-    {
-      id: '2',
-      name: 'Ziad Matni',
-      recipes: ['Chicken Curry', 'Beef Tacos']
-    },
-    {
-      id: '3',
-      name: 'Tobias Hollerer',
-      recipes: ['Margherita Pizza', 'Pumpkin Soup', 'Grilled Salmon']
-    },
-    {
-      id: '4',
-      name: 'Taylor Swift',
-      recipes: ['Vegetable Stir Fry', 'Chocolate Chip Cookies', 'Mushroom Risotto']
-    },
-    {
-      id: '5',
-      name: 'Ariana Grande',
-      recipes: ['Chicken Alfredo', 'Greek Salad', 'Banana Bread']
-    },
-    {
-      id: '6',
-      name: 'Minecraft Steve',
-      recipes: ['Suspicious Stew', 'Milk Bucket', 'Awkward Potion']
-    }
-  ];
-
-  // Current friends list - initially showing first 6 friends
-  const [friends, setFriends] = useState<Friend[]>(allPossibleFriends.slice(0, 6));
-
-  // Suggested friends - calculated based on who is not in current friends
   const [suggestedFriends, setSuggestedFriends] = useState<Friend[]>([]);
 
-  // Update suggested friends whenever the friends list changes
   useEffect(() => {
-    const newSuggestedFriends = allPossibleFriends.filter(
-      possibleFriend => !friends.some(friend => friend.id === possibleFriend.id)
-    );
-    setSuggestedFriends(newSuggestedFriends);
-  }, [friends]);
+    if (user?.email) {
+      fetchFriends();
+    }
+  }, [user]);
 
-  const handleRemoveFriend = (friendId: string) => {
-    setFriends(friends.filter(friend => friend.id !== friendId));
-    // Note: We don't need to update suggestedFriends here as the useEffect will handle it
-  };
-
-  const handleAddFriend = (friendToAdd: Friend) => {
-    setFriends([...friends, friendToAdd]);
-    // Close modal if there are no more suggested friends
-    if (suggestedFriends.length === 1) {
-      setSuggestedFriendsModalVisible(false);
+  const fetchFriends = async () => {
+    try {
+      const response = await fetch(`${API_URL}/friends/${user?.email}`);
+      const data = await response.json();
+  
+      console.log("Fetched friends:", data); // Debugging log
+  
+      // Ensure name is displayed properly
+      const formattedFriends = data.map((friend: Friend) => ({
+        ...friend,
+        name: friend.name ? `${friend.name} (${friend.email})` : friend.email, // Show Name + Email if name exists
+      }));
+  
+      setFriends(formattedFriends);
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+      Alert.alert("Error", "Failed to fetch friends.");
     }
   };
 
-  const handleAddFriendByEmail = () => {
-    // Logic to handle adding a friend by email
-    const friend = allPossibleFriends.find(f => f.email === emailInput);
-    if (friend) {
-      handleAddFriend(friend);
-      setEmailInput(''); // Reset email input after adding
-    } else {
-      Alert.alert('Friend not found', 'No friend with this email exists.');
+  const handleAddFriendByEmail = async () => {
+    if (!emailInput.trim()) {
+      Alert.alert("Error", "Please enter a friend's email.");
+      return;
+    }
+  
+    const friendData = { name: emailInput, email: emailInput, recipes: [] };
+  
+    try {
+      const response = await fetch(`${API_URL}/friends/add?user_email=${user?.email}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(friendData),
+      });
+  
+      if (!response.ok) throw new Error("Failed to add friend");
+  
+      Alert.alert("Success", `${emailInput} has been added as a friend.`);
+      setEmailInput(""); // Reset input
+      setSuggestedFriendsModalVisible(false); // Close modal after adding
+      fetchFriends(); // Refresh friend list
+    } catch (error) {
+      console.error("Error adding friend:", error);
+      Alert.alert("Error", "Failed to add friend.");
+    }
+  };
+
+  const handleRemoveFriend = async (friendEmail: string) => {
+    if (!user?.email) {
+      Alert.alert("Error", "User email is missing.");
+      return;
+    }
+  
+    console.log("Removing friend with email:", friendEmail); // Debugging log
+  
+    try {
+      const response = await fetch(`${API_URL}/friends/remove?user_email=${user.email}&friend_email=${friendEmail}`, {
+        method: "DELETE",
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to remove friend");
+      }
+  
+      Alert.alert("Success", "Friend removed successfully.");
+      fetchFriends(); // Refresh the friends list
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      Alert.alert("Error", error.message || "Failed to remove friend.");
+    }
+  };
+  
+
+  const fetchFriendRecipes = async (friendEmail: string) => {
+    if (!friendEmail) {
+      Alert.alert("Error", "Friend email is missing.");
+      return;
+    }
+  
+    try {
+      console.log(`Fetching favorite recipes for: ${friendEmail}`);
+  
+      const response = await fetch(`${API_URL}/friends/recipes/${friendEmail}`);
+      const data = await response.json();
+  
+      console.log("Fetched friend recipes:", data); // Debugging log
+  
+      if (!data || !Array.isArray(data.recipes)) {
+        console.error("Unexpected data format:", data);
+        Alert.alert("Error", "Unexpected data format received.");
+        return;
+      }
+  
+      setSelectedFriend({
+        name: friendEmail, // Use friend's email or name
+        recipes: data.recipes, // Store fetched recipes
+      });
+  
+    } catch (error) {
+      console.error("Error fetching friend's recipes:", error);
+      Alert.alert("Error", "Failed to fetch friend's recipes.");
     }
   };
 
@@ -140,12 +184,12 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
             <View key={friend.id} style={styles.friendsCard}>
               <Image source={require('../assets/images/defaultprofilepic.png')} style={styles.friendIcon} />
               <View style={{ flex: 1 }}>
-                <TouchableOpacity onPress={() => setSelectedFriend(friend)}>
-                  <Text style={styles.friendName}>{friend.name}</Text>
-                  <Text style={styles.friendText}>❤️️ See their favorites!</Text>
-                </TouchableOpacity>
+              <TouchableOpacity onPress={() => fetchFriendRecipes(friend.email)}>
+                <Text style={styles.friendName}>{friend.name}</Text>
+                <Text style={styles.friendText}>❤️️ See their favorites!</Text>
+              </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveFriend(friend.id)}>
+              <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveFriend(friend.email)}>
                 <Text style={styles.removeButtonText}>Remove</Text>
               </TouchableOpacity>
             </View>
@@ -166,11 +210,25 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       <Modal visible={!!selectedFriend} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{selectedFriend?.name}'s Favorite Recipes</Text>
-            {selectedFriend?.recipes.map((recipe, index) => (
-              <Text key={index} style={styles.recipeText}>• {recipe}</Text>
-            ))}
-            <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedFriend(null)}>
+            <Text style={styles.modalTitle}>
+              {selectedFriend?.name}'s Favorite Recipes
+            </Text>
+
+            {selectedFriend?.recipes && Array.isArray(selectedFriend.recipes) && selectedFriend.recipes.length > 0 ? (
+              selectedFriend.recipes.map((recipe, index) => (
+                <View key={index} style={{ marginBottom: 10 }}>
+                  <Text style={styles.recipeText}>• {recipe.title}</Text>
+                  <Text style={styles.recipeDescription}>{recipe.description || "No description available"}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noFriendsText}>No favorite recipes found.</Text>
+            )}
+
+            <TouchableOpacity 
+              style={styles.closeButton} 
+              onPress={() => setSelectedFriend(null)}
+            >
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -198,7 +256,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                   </View>
                   <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => handleAddFriend(suggestedFriend)}
+                    onPress={handleAddFriendByEmail} // Ensure it calls the function
                   >
                     <Text style={styles.addButtonText}>Add</Text>
                   </TouchableOpacity>

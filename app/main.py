@@ -17,6 +17,7 @@ from bson.objectid import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import login
 from pydantic import BaseModel
+from typing import List
 import os
 
 
@@ -354,3 +355,91 @@ def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return {"message": f"Removed {recipe.title} from favorites"}
+
+
+#everything below is for friends
+
+friends_collection = db["friends"]
+
+class Friend(BaseModel):
+    name: str
+    email: str
+    recipes: List[str]
+
+@app.get("/friends/{user_email}")
+def get_friends(user_email: str):
+    """
+    Retrieve the list of friends for a given user.
+    """
+    friends = list(friends_collection.find({"user_email": user_email}, {"_id": 0, "name": 1, "email": 1}))
+    
+    print("Fetched friends from DB:", friends) 
+    return friends
+
+@app.post("/friends/add")
+def add_friend(user_email: str, friend: Friend):
+    """
+    Add a friend to the user's friend list, ensuring a bidirectional friendship.
+    """
+    if user_email == friend.email:
+        raise HTTPException(status_code=400, detail="You cannot add yourself as a friend.")
+
+    existing_friendship = friends_collection.find_one(
+        {"user_email": user_email, "email": friend.email}
+    )
+    if existing_friendship:
+        raise HTTPException(status_code=400, detail="Friend already added")
+
+    # Add friend to sender's list
+    sender_friend_data = {
+        "user_email": user_email,
+        "email": friend.email,
+        "name": friend.name,
+        "recipes": friend.recipes
+    }
+    friends_collection.insert_one(sender_friend_data)
+
+    # Add sender to receiver's list (bidirectional friendship)
+    receiver_friend_data = {
+        "user_email": friend.email,
+        "email": user_email,
+        "name": None,  # This will be fetched dynamically from frontend
+        "recipes": []
+    }
+    friends_collection.insert_one(receiver_friend_data)
+
+    return {"message": "Friend added successfully in both directions"}
+
+
+@app.delete("/friends/remove")
+def remove_friend(user_email: str, friend_email: str):
+    """
+    Remove a friend from the user's friend list.
+    """
+    print(f"Received DELETE request: user_email={user_email}, friend_email={friend_email}")  # Debugging
+
+    if not user_email or not friend_email:
+        raise HTTPException(status_code=400, detail="Missing user_email or friend_email")
+
+    result = friends_collection.delete_one({"user_email": user_email, "email": friend_email})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Friend not found")
+
+    return {"message": "Friend removed successfully"}
+    
+@app.get("/friends/recipes/{friend_email}")
+def get_friend_recipes(friend_email: str):
+    """
+    Retrieve the favorite recipes of a specific friend.
+    """
+    favorite_recipes_cursor = favorite_recipes.find({"user_email": friend_email})  # Correct field name
+    friend_recipes = [
+        {
+            "title": recipe["title"],
+            "description": recipe.get("description", "")
+        }
+        for recipe in favorite_recipes_cursor
+    ]
+
+    return {"recipes": friend_recipes}  # Always return, even if empty
