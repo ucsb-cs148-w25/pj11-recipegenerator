@@ -9,10 +9,15 @@ interface ProfilePageProps {
   user: User | null;
 }
 
+interface Recipe {
+  title: string;
+  description: string;
+}
+
 interface Friend {
   id: string;
   name: string;
-  recipes: string[];
+  recipes: Recipe[];
   email?: string; // optional email property
 }
 
@@ -54,30 +59,38 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
   const handleAddFriendByEmail = async () => {
     if (!emailInput.trim()) {
-      Alert.alert("Error", "Please enter a friend's email.");
-      return;
+        Alert.alert("Error", "Please enter a friend's email.");
+        return;
     }
-  
-    const friendData = { name: emailInput, email: emailInput, recipes: [] };
-  
+
+    const friendData = {
+        id: "",  // ✅ Set an empty `id` (MongoDB will replace it)
+        name: emailInput,
+        email: emailInput,
+        recipes: []
+    };
+
     try {
-      const response = await fetch(`${API_URL}/friends/add?user_email=${user?.email}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(friendData),
-      });
-  
-      if (!response.ok) throw new Error("Failed to add friend");
-  
-      Alert.alert("Success", `${emailInput} has been added as a friend.`);
-      setEmailInput(""); // Reset input
-      setSuggestedFriendsModalVisible(false); // Close modal after adding
-      fetchFriends(); // Refresh friend list
-    } catch (error) {
-      console.error("Error adding friend:", error);
-      Alert.alert("Error", "Failed to add friend.");
-    }
-  };
+        const response = await fetch(`${API_URL}/friends/add?user_email=${user?.email}`, {  
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(friendData),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            throw new Error(responseData.detail || "Failed to add friend");
+        }
+
+        Alert.alert("Success", `${emailInput} has been added as a friend.`);
+        setEmailInput(""); // Reset input
+        fetchFriends(); // Refresh friend list
+        } catch (error) {
+            console.error("Error adding friend:", error);
+            Alert.alert("Error", error.message || "Failed to add friend.");
+        }
+    };
 
   const handleRemoveFriend = async (friendEmail: string) => {
     if (!user?.email) {
@@ -107,35 +120,37 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   
 
   const fetchFriendRecipes = async (friendEmail: string) => {
-    if (!friendEmail) {
-      Alert.alert("Error", "Friend email is missing.");
-      return;
-    }
-  
     try {
-      console.log(`Fetching favorite recipes for: ${friendEmail}`);
-  
-      const response = await fetch(`${API_URL}/friends/recipes/${friendEmail}`);
-      const data = await response.json();
-  
-      console.log("Fetched friend recipes:", data); // Debugging log
-  
-      if (!data || !Array.isArray(data.recipes)) {
-        console.error("Unexpected data format:", data);
-        Alert.alert("Error", "Unexpected data format received.");
-        return;
-      }
-  
       setSelectedFriend({
-        name: friendEmail, // Use friend's email or name
-        recipes: data.recipes, // Store fetched recipes
+        id: "",
+        name: friendEmail,
+        recipes: [],
+        email: friendEmail
       });
-  
+      
+      const response = await fetch(`${API_URL}/friends/recipes/${friendEmail}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to fetch recipes");
+      }
+      
+      const data = await response.json();
+      console.log("Fetched friend recipes:", data); // Debugging log
+      
+      // Update the selected friend with recipes
+      setSelectedFriend(prev => ({
+        ...prev,
+        recipes: data.recipes || []
+      }));
+      
     } catch (error) {
       console.error("Error fetching friend's recipes:", error);
       Alert.alert("Error", "Failed to fetch friend's recipes.");
     }
   };
+
+
 
 
 

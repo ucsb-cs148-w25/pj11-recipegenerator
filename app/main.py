@@ -379,36 +379,45 @@ def get_friends(user_email: str):
 @app.post("/friends/add")
 def add_friend(user_email: str, friend: Friend):
     """
-    Add a friend to the user's friend list, ensuring a bidirectional friendship.
+    Add a friend to the user's friend list and ensure we store their correct user_id.
     """
+
+    # 🔎 Step 1: Look up the friend's actual `user_id` using their email from `favorite_recipes`
+    friend_data = favorite_recipes.find_one(
+        {"email": friend.email},  # Find by email
+        {"user_id": 1, "_id": 0}  # Only return user_id
+    )
+
+    # Step 2: Store correct `user_id`, or fallback to email if not found
+    friend_user_id = friend_data["user_id"] if friend_data and "user_id" in friend_data else None
+
+    if not friend_user_id:
+        print(f"⚠️ No user_id found for {friend.email}. Defaulting to email.")  # Debugging log
+        friend_user_id = friend.email  # Fallback to email
+
+    print(f"📌 Adding friend: {friend.email} | Found user_id: {friend_user_id}")  # Debugging log
+
+    # Step 3: Prevent self-adding
     if user_email == friend.email:
         raise HTTPException(status_code=400, detail="You cannot add yourself as a friend.")
 
-    existing_friendship = friends_collection.find_one(
-        {"user_email": user_email, "email": friend.email}
-    )
+    # Step 4: Prevent duplicate friendships
+    existing_friendship = friends_collection.find_one({"user_email": user_email, "email": friend.email})
     if existing_friendship:
         raise HTTPException(status_code=400, detail="Friend already added")
 
-    # Add friend to sender's list
+    # Step 5: Store friend with the correct user_id
     sender_friend_data = {
         "user_email": user_email,
         "email": friend.email,
         "name": friend.name,
+        "user_id": friend_user_id,  # ✅ Store correct `user_id`
         "recipes": friend.recipes
     }
     friends_collection.insert_one(sender_friend_data)
 
-    # Add sender to receiver's list (bidirectional friendship)
-    receiver_friend_data = {
-        "user_email": friend.email,
-        "email": user_email,
-        "name": None,  # This will be fetched dynamically from frontend
-        "recipes": []
-    }
-    friends_collection.insert_one(receiver_friend_data)
+    return {"message": f"Friend {friend.email} added successfully with user_id {friend_user_id}"}
 
-    return {"message": "Friend added successfully in both directions"}
 
 
 @app.delete("/friends/remove")
@@ -431,9 +440,22 @@ def remove_friend(user_email: str, friend_email: str):
 @app.get("/friends/recipes/{friend_email}")
 def get_friend_recipes(friend_email: str):
     """
-    Retrieve the favorite recipes of a specific friend.
+    Retrieve the favorite recipes of a specific friend using their email.
     """
-    favorite_recipes_cursor = favorite_recipes.find({"user_email": friend_email})  # Correct field name
+    print(f"🔎 Looking up user_id for email: {friend_email}")  # Debugging
+
+    # Step 1: Find the corresponding user_id from the `friends` collection
+    friend_data = friends_collection.find_one({"email": friend_email}, {"user_id": 1, "_id": 0})
+
+    if not friend_data or "user_id" not in friend_data:
+        raise HTTPException(status_code=404, detail="User ID not found for this email")
+
+    friend_user_id = friend_data["user_id"]
+    print(f"✅ Found user_id: {friend_user_id} for email: {friend_email}")  # Debugging
+
+    # Step 2: Fetch favorite recipes using the user_id
+    favorite_recipes_cursor = favorite_recipes.find({"user_id": friend_user_id})
+
     friend_recipes = [
         {
             "title": recipe["title"],
@@ -442,4 +464,9 @@ def get_friend_recipes(friend_email: str):
         for recipe in favorite_recipes_cursor
     ]
 
-    return {"recipes": friend_recipes}  # Always return, even if empty
+    print(f"🍽 Found {len(friend_recipes)} favorite recipes for user_id: {friend_user_id}")  # Debugging
+
+    if not friend_recipes:
+        raise HTTPException(status_code=404, detail="Friend has no favorite recipes")
+
+    return {"recipes": friend_recipes}
