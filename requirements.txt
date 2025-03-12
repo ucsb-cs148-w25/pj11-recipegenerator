@@ -8,3 +8,4 @@ requests
 openai
 groq
 python-dotenv
+jwt
