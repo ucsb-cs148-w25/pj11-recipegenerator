@@ -16,7 +16,7 @@ Google OAuth code available in \router, but need to be incorporated into main.py
 
 Get everything into your local folder. CD into the folder "app".
 
-Run `uvicorn main:app --reload` to get the app running. Check [AndrewZhangHelloWorld](../TeamHelloWorld/AndrewZhangHelloWorld/README.md) to see how to make it happen!
+Run `uvicorn main:app --reload` to get the app running. 
 
 All items are stored in json in the form `{"name": "name", "quantity": 1}`.
 

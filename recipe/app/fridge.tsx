@@ -10,7 +10,6 @@ import {
   FlatList,
   Alert,
   Modal,
-  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -24,6 +23,7 @@ type FridgeItem = {
   id?: string;
   name: string;
   quantity: number;
+  selected?: boolean; // Add selected property for batch operations
 };
 
 type TimerRefs = {
@@ -46,8 +46,12 @@ enum TutorialStep {
   AddItem = 1,
   SwipeToDelete = 2,
   UndoDelete = 3,
-  ImageUpload = 4,
-  Completed = 5,
+  SearchFeature = 4,
+  SortFeature = 5,
+  BatchSelectionFeature1 = 6,
+  BatchSelectionFeature2 = 7,
+  ImageUpload = 8,
+  Completed = 9,
 }
 
 // Define sort types with direction built in
@@ -112,6 +116,30 @@ function FridgePage() {
   const [sortType, setSortType] = useState<SortType>(SortType.None);
   // New dropdown state
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  // Add search functionality
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Batch selection states
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+  // Add this effect at the component level, near other useEffect hooks
+  useEffect(() => {
+    // If we're on batch selection step 1 and batch mode is already active, skip to step 2
+    if (currentTutorialStep === TutorialStep.BatchSelectionFeature1 && batchMode) {
+      setCurrentTutorialStep(TutorialStep.BatchSelectionFeature2);
+    }
+  }, [currentTutorialStep, batchMode]);
+
+  // Filter items based on search query
+  const filterItems = (items: FridgeItem[]): FridgeItem[] => {
+    if (!searchQuery.trim()) return items;
+
+    return items.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
 
   useEffect(() => {
     fetchItems();
@@ -472,45 +500,184 @@ function FridgePage() {
     }
   };
 
-  // The UI for a single fridge item.
-  const renderFridgeItemContent = (item: FridgeItem) => {
+  // Update the sorting function to work with the new sort types
+  const sortItems = (items: FridgeItem[]): FridgeItem[] => {
+    if (sortType === SortType.None) return items;
+
+    const sortedItems = [...items];
+
+    switch (sortType) {
+      case SortType.NameAZ:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        break;
+
+      case SortType.NameZA:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameB.localeCompare(nameA);
+        });
+        break;
+
+      case SortType.QuantityLowHigh:
+        sortedItems.sort((a, b) => a.quantity - b.quantity);
+        break;
+
+      case SortType.QuantityHighLow:
+        sortedItems.sort((a, b) => b.quantity - a.quantity);
+        break;
+    }
+
+    return sortedItems;
+  };
+
+  // Get the active sort option
+  const getActiveSortOption = (): SortOption => {
     return (
-      <View style={styles.ingredientItem}>
-        <Text style={styles.ingredientText}>{item.name}</Text>
-        <View style={styles.quantityControls}>
-          <TouchableOpacity
-            onPress={() => decrementQuantity(item.name, item.quantity)}
-          >
-            <Text style={styles.quantityButton}>-</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.quantityInput}
-            keyboardType="numeric"
-            value={
-              editingQuantity[item.name] !== undefined
-                ? editingQuantity[item.name]
-                : String(item.quantity)
-            }
-            onChangeText={(text) =>
-              setEditingQuantity({ ...editingQuantity, [item.name]: text })
-            }
-            onSubmitEditing={() => updateQuantity(item.name)}
-          />
-          <TouchableOpacity
-            onPress={() => incrementQuantity(item.name, item.quantity)}
-          >
-            <Text style={styles.quantityButton}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      sortOptions.find((option) => option.value === sortType) || sortOptions[0]
     );
+  };
+
+  // Toggle batch selection mode
+  const toggleBatchMode = () => {
+    if (batchMode) {
+      // Clear selections when exiting batch mode
+      setSelectedItems([]);
+    }
+    setBatchMode(!batchMode);
+  };
+
+  // Toggle selection of an item
+  const toggleItemSelection = (itemName: string) => {
+    setSelectedItems(prev => {
+      if (prev.includes(itemName)) {
+        return prev.filter(name => name !== itemName);
+      } else {
+        return [...prev, itemName];
+      }
+    });
+  };
+
+  // Delete multiple items
+  const deleteMultipleItems = async () => {
+    if (selectedItems.length === 0) return;
+
+    // Create a map of all selected items with their original data
+    const itemsToDelete: { [key: string]: FridgeItem } = {};
+    const itemIndices: { [key: string]: number } = {};
+
+    selectedItems.forEach(itemName => {
+      const itemIndex = items.findIndex(i => i.name === itemName);
+      const item = items[itemIndex];
+      if (item) {
+        itemsToDelete[itemName] = item;
+        itemIndices[itemName] = itemIndex;
+      }
+    });
+
+    // Update deleted items state for undo functionality
+    const newDeletedItems = { ...deletedItems };
+
+    selectedItems.forEach(itemName => {
+      newDeletedItems[itemName] = {
+        item: itemsToDelete[itemName],
+        timestamp: Date.now(),
+        originalIndex: itemIndices[itemName] >= 0 ? itemIndices[itemName] : 0,
+      };
+    });
+
+    setDeletedItems(newDeletedItems);
+
+    // Update UI immediately (optimistic update)
+    setItems(prev => prev.filter(item => !selectedItems.includes(item.name)));
+
+    // Set up fade animations for each item
+    selectedItems.forEach(itemName => {
+      fadeAnimRef.current[itemName] = new Animated.Value(1);
+
+      setTimeout(() => {
+        Animated.timing(fadeAnimRef.current[itemName], {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }, 4500);
+    });
+
+    // Set up deletion timers
+    selectedItems.forEach(itemName => {
+      timersRef.current[itemName] = setTimeout(async () => {
+        try {
+          await apiRequest("/fridge/remove", "POST", {
+            name: itemName,
+            quantity: 1000000000,
+          } as any);
+          setDeletedItems(prev => {
+            const updated = { ...prev };
+            delete updated[itemName];
+            return updated;
+          });
+        } catch (error) {
+          console.error(`Error removing item ${itemName}:`, error);
+        }
+      }, 5000);
+    });
+
+    // Exit batch mode after deletion
+    setBatchMode(false);
+    setSelectedItems([]);
+
+    // If on batch selection tutorial step 2, proceed to next step (image upload)
+    if (currentTutorialStep === TutorialStep.BatchSelectionFeature2) {
+      nextTutorialStep();
+    }
   };
 
   // Render each item using our custom swipeable row.
   const renderItem = ({ item }: { item: FridgeItem }) => {
     return (
-      <SwipeableItem onDelete={() => deleteItem(item)} borderRadius={10}>
-        {renderFridgeItemContent(item)}
+      <SwipeableItem
+        onDelete={() => deleteItem(item)}
+        borderRadius={20}
+        selectMode={batchMode}
+        selected={selectedItems.includes(item.name)}
+        onToggleSelect={() => toggleItemSelection(item.name)}
+      >
+        <View style={styles.ingredientItem}>
+          <Text style={styles.ingredientText}>{item.name}</Text>
+          <View style={styles.quantityControls}>
+            <TouchableOpacity
+              onPress={() => decrementQuantity(item.name, item.quantity)}
+              disabled={batchMode}
+            >
+              <Text style={[styles.quantityButton, batchMode && styles.disabledButton]}>-</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="numeric"
+              value={
+                editingQuantity[item.name] !== undefined
+                  ? editingQuantity[item.name]
+                  : String(item.quantity)
+              }
+              onChangeText={(text) =>
+                setEditingQuantity({ ...editingQuantity, [item.name]: text })
+              }
+              onSubmitEditing={() => updateQuantity(item.name)}
+              editable={!batchMode}
+            />
+            <TouchableOpacity
+              onPress={() => incrementQuantity(item.name, item.quantity)}
+              disabled={batchMode}
+            >
+              <Text style={[styles.quantityButton, batchMode && styles.disabledButton]}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SwipeableItem>
     );
   };
@@ -552,7 +719,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: SCREEN_HEIGHT / 4,
+          top: SCREEN_HEIGHT / 2.6,
           left: 20,
           right: 20,
         };
@@ -576,10 +743,81 @@ function FridgePage() {
         };
         break;
 
+      case TutorialStep.SearchFeature:
+        tooltipContent = (
+          <>
+            <Text style={styles.tooltipTitle}>4. Search Ingredients</Text>
+            <Text style={styles.tooltipText}>
+              <Text style={styles.actionText}>Try it now:</Text> Use the search bar
+              at the top to quickly find ingredients in your fridge. Just start typing
+              and the list will automatically filter to match your search.
+            </Text>
+          </>
+        );
+        tooltipPosition = {
+          top: 140,
+          left: 20,
+          right: 20,
+        };
+        break;
+
+      case TutorialStep.SortFeature:
+        tooltipContent = (
+          <>
+            <Text style={styles.tooltipTitle}>5. Sort Ingredients</Text>
+            <Text style={styles.tooltipText}>
+              <Text style={styles.actionText}>Try it now:</Text> Tap the sort dropdown
+              on the right to organize your ingredients. You can sort by name (A-Z or Z-A)
+              or by quantity (low to high or high to low).
+            </Text>
+          </>
+        );
+        tooltipPosition = {
+          top: 190,
+          left: 20,
+          right: 20,
+        };
+        break;
+
+      case TutorialStep.BatchSelectionFeature1:
+        tooltipContent = (
+          <>
+            <Text style={styles.tooltipTitle}>6. Batch Selection</Text>
+            <Text style={styles.tooltipText}>
+              <Text style={styles.actionText}>Try it now:</Text> Tap "Select Multiple" to
+              enter batch mode. You can select several items at once and delete them all
+              with a single tap. Perfect for cleaning up your fridge!
+            </Text>
+          </>
+        );
+        tooltipPosition = {
+          top: 190,
+          left: 20,
+          right: 20,
+        };
+        break;
+
+      case TutorialStep.BatchSelectionFeature2:
+        tooltipContent = (
+          <>
+            <Text style={styles.tooltipTitle}>6. Batch Selection</Text>
+            <Text style={styles.tooltipText}>
+              <Text style={styles.actionText}>Try it now:</Text> Now you can select multiple items and delete them all with a single tap.
+            </Text>
+          </>
+        );
+        tooltipPosition = {
+          top: 520,
+          left: 20,
+          right: 20,
+        };
+        break;
+
       case TutorialStep.ImageUpload:
         tooltipContent = (
           <>
-            <Text style={styles.tooltipTitle}>4. Upload Images</Text>
+            {/* If select multiple is active, unselect it first */}
+            <Text style={styles.tooltipTitle}>7. Upload Images</Text>
             <Text style={styles.tooltipText}>
               <Text style={styles.actionText}>Try it now:</Text> Tap the camera
               icon to upload an image of ingredients and automatically add them
@@ -696,56 +934,59 @@ function FridgePage() {
     );
   };
 
-  // Update the sorting function to work with the new sort types
-  const sortItems = (items: FridgeItem[]): FridgeItem[] => {
-    if (sortType === SortType.None) return items;
-
-    const sortedItems = [...items];
-
-    switch (sortType) {
-      case SortType.NameAZ:
-        sortedItems.sort((a, b) => {
-          const nameA = a.name.toLowerCase();
-          const nameB = b.name.toLowerCase();
-          return nameA.localeCompare(nameB);
-        });
-        break;
-
-      case SortType.NameZA:
-        sortedItems.sort((a, b) => {
-          const nameA = a.name.toLowerCase();
-          const nameB = b.name.toLowerCase();
-          return nameB.localeCompare(nameA);
-        });
-        break;
-
-      case SortType.QuantityLowHigh:
-        sortedItems.sort((a, b) => a.quantity - b.quantity);
-        break;
-
-      case SortType.QuantityHighLow:
-        sortedItems.sort((a, b) => b.quantity - a.quantity);
-        break;
-    }
-
-    return sortedItems;
-  };
-
-  // Get the active sort option
-  const getActiveSortOption = (): SortOption => {
-    return (
-      sortOptions.find((option) => option.value === sortType) || sortOptions[0]
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
 
-      {/* Sorting Controls - Dropdown Style */}
-      <View style={styles.sortControlsContainer}>
+      {/* Add Search Bar */}
+      <View style={[
+        styles.searchContainer,
+        currentTutorialStep === TutorialStep.SearchFeature && styles.highlightedElement
+      ]}>
+        <FontAwesome name="search" size={16} color="#088F8F" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search ingredients..."
+          placeholderTextColor="#AAAAAA"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          clearButtonMode="while-editing"
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <FontAwesome name="times-circle" size={16} color="#088F8F" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Batch Mode and Sorting Controls */}
+      <View style={styles.controlsRow}>
+        {/* Batch Mode Toggle */}
         <TouchableOpacity
-          style={styles.sortDropdownButton}
+          style={[
+            styles.batchModeButton,
+            batchMode && styles.batchModeActiveButton,
+            currentTutorialStep === TutorialStep.BatchSelectionFeature1 && styles.highlightedElement
+          ]}
+          onPress={toggleBatchMode}
+        >
+          <FontAwesome
+            name={batchMode ? "check-square-o" : "square-o"}
+            size={16}
+            color="#088F8F"
+            style={styles.batchIcon}
+          />
+          <Text style={styles.batchModeText}>
+            {batchMode ? "Done Selecting" : "Select Multiple"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Sorting Controls - Dropdown Style */}
+        <TouchableOpacity
+          style={[
+            styles.sortDropdownButton,
+            currentTutorialStep === TutorialStep.SortFeature && styles.highlightedElement
+          ]}
           onPress={() => setShowSortDropdown(true)}
         >
           <FontAwesome
@@ -796,7 +1037,7 @@ function FridgePage() {
                   style={[
                     styles.sortDropdownItemText,
                     sortType === option.value &&
-                      styles.sortDropdownItemTextActive,
+                    styles.sortDropdownItemTextActive,
                   ]}
                 >
                   {option.label}
@@ -807,62 +1048,83 @@ function FridgePage() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Custom swipe-to-delete list with sorted items */}
+      {/* Custom swipe-to-delete list with sorted and filtered items */}
       <FlatList
-        data={sortItems(items)}
+        data={filterItems(sortItems(items))}
         keyExtractor={(item) => item.id || item.name}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 5 }}
       />
 
       {/* Floating Add Ingredient Section */}
-      <View style={styles.floatingAddContainer}>
-        <TouchableOpacity
-          style={[
-            styles.cameraButton,
-            currentTutorialStep === TutorialStep.ImageUpload &&
+      {!batchMode && (
+        <View style={styles.floatingAddContainer}>
+          <TouchableOpacity
+            style={[
+              styles.cameraButton,
+              currentTutorialStep === TutorialStep.ImageUpload &&
               styles.highlightedElement,
-          ]}
-          onPress={handleCameraButtonPress}
-        >
-          <FontAwesome name="camera" size={22} color="#088F8F" />
-        </TouchableOpacity>
+            ]}
+            onPress={handleCameraButtonPress}
+          >
+            <FontAwesome name="camera" size={22} color="#088F8F" />
+          </TouchableOpacity>
 
-        <View
-          style={[
-            styles.inputContainer,
-            currentTutorialStep === TutorialStep.AddItem &&
+          <View
+            style={[
+              styles.inputContainer,
+              currentTutorialStep === TutorialStep.AddItem &&
               styles.highlightedElement,
-          ]}
-        >
-          <TextInput
-            style={styles.floatingInput}
-            placeholder="Add ingredient"
-            placeholderTextColor="#AAAAAA"
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            style={styles.quantityFloatingInput}
-            placeholder="Qty"
-            placeholderTextColor="#AAAAAA"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-          />
+            ]}
+          >
+            <TextInput
+              style={styles.floatingInput}
+              placeholder="Add ingredient"
+              placeholderTextColor="#AAAAAA"
+              value={name}
+              onChangeText={setName}
+            />
+            <TextInput
+              style={styles.quantityFloatingInput}
+              placeholder="Qty"
+              placeholderTextColor="#AAAAAA"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.floatingAddButton,
+              currentTutorialStep === TutorialStep.AddItem &&
+              styles.highlightedElement,
+            ]}
+            onPress={addItem}
+          >
+            <FontAwesome name="plus" size={22} color="#088F8F" />
+          </TouchableOpacity>
         </View>
+      )}
 
-        <TouchableOpacity
-          style={[
-            styles.floatingAddButton,
-            currentTutorialStep === TutorialStep.AddItem &&
-              styles.highlightedElement,
-          ]}
-          onPress={addItem}
-        >
-          <FontAwesome name="plus" size={22} color="#088F8F" />
-        </TouchableOpacity>
-      </View>
+      {/* Batch Action Bar - Floating at bottom */}
+      {batchMode && selectedItems.length > 0 && (
+        <View style={[
+          styles.floatingBatchActionBar,
+          currentTutorialStep === TutorialStep.BatchSelectionFeature2 && styles.highlightedElement
+        ]}>
+          <Text style={styles.floatingBatchSelectionCount}>
+            {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+          </Text>
+          <TouchableOpacity
+            style={styles.batchDeleteButton}
+            onPress={deleteMultipleItems}
+          >
+            <FontAwesome name="trash" size={16} color="white" />
+            <Text style={styles.batchDeleteText}>Delete Selected</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Undo Toasts */}
       {Object.keys(deletedItems).map((itemName) => (
@@ -870,9 +1132,13 @@ function FridgePage() {
           key={itemName}
           style={[
             styles.undoToast,
-            { opacity: fadeAnimRef.current[itemName] || 1 },
+            {
+              opacity: fadeAnimRef.current[itemName] || 1,
+              bottom: (batchMode && selectedItems.length > 0 ? 100 : 70) +
+                Object.keys(deletedItems).indexOf(itemName) * 10 // Adjust position based on batch mode
+            },
             currentTutorialStep === TutorialStep.UndoDelete &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
         >
           <Text style={styles.undoText}>"{itemName}" removed</Text>
@@ -1342,7 +1608,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    minWidth: 150,
+    minWidth: 120,
     maxWidth: 200,
     justifyContent: "space-between",
   },
@@ -1393,6 +1659,105 @@ const styles = StyleSheet.create({
   sortDropdownItemTextActive: {
     color: "#FFF",
     fontWeight: "bold",
+  },
+  /* Add Search Bar */
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    color: "#333",
+  },
+  controlsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+    paddingHorizontal: 5,
+  },
+  batchModeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#088F8F",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  batchModeActiveButton: {
+    backgroundColor: "#E6F7F2",
+  },
+  batchModeText: {
+    fontSize: 14,
+    color: "#088F8F",
+    fontWeight: "500",
+  },
+  batchIcon: {
+    marginRight: 8,
+  },
+  batchDeleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FF6B6B",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+  },
+  batchDeleteText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  // New floating batch action bar style
+  floatingBatchActionBar: {
+    position: "absolute",
+    bottom: 25,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#088F8F",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 50,
+  },
+  floatingBatchSelectionCount: {
+    fontSize: 16,
+    color: "white",
+    fontWeight: "600",
   },
 });
 
