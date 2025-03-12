@@ -1,11 +1,36 @@
-import { View, Text, Switch, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Switch,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [friendsSuggestionEnabled, setFriendsSuggestionEnabled] =
     useState(false);
   const [friendsActivityEnabled, setFriendsActivityEnabled] = useState(false);
+
+  // Function to reset tutorial flags in AsyncStorage
+  const resetTutorial = async () => {
+    try {
+      await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+
+      // Simple confirmation
+      Alert.alert(
+        "Tutorial Reset",
+        "The tutorial has been reset. It will appear the next time you visit the Fridge page."
+      );
+    } catch (error) {
+      console.error("Error resetting tutorial:", error);
+      Alert.alert("Error", "Failed to reset tutorial. Please try again.");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
@@ -34,6 +59,18 @@ export default function SettingsPage() {
             value={friendsActivityEnabled}
             onValueChange={(value) => setFriendsActivityEnabled(value)}
           />
+        </View>
+      </View>
+      <View style={styles.settingscard}>
+        <Text style={styles.sectionTitle}>Help & Tutorials</Text>
+        <View style={styles.tutorialButtonContainer}>
+          <Text style={styles.settingDescription}>
+            Reset the tutorial to see it again the next time you visit the
+            Fridge page
+          </Text>
+          <TouchableOpacity style={styles.resetButton} onPress={resetTutorial}>
+            <Text style={styles.resetButtonText}>Reset Tutorial</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -75,5 +112,36 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.1,
+  },
+  tutorialButtonContainer: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  resetButton: {
+    backgroundColor: "#088F8F",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginTop: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  resetButtonText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
