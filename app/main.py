@@ -21,7 +21,7 @@ import os
 
 
 # Import `get_current_user` from `login.py`
-from app.routers.login import get_current_user
+from app.routers.login import get_current_user, get_user_profile
 
 
 # Import the ML functions
@@ -40,7 +40,10 @@ from app.models import (
     ImageRecipeResponse,
     FavoriteRecipe,
     RemoveFavoriteRequest,
-    RecipePreferences
+    RecipePreferences,
+    UserProfile,
+    UpdateProfilePictureRequest,
+    UpdateProfileResponse
 )
 
 # MongoDB URI
@@ -58,6 +61,9 @@ class Item(BaseModel):
 
 # Connect to MongoDB collections
 favorite_recipes = db["favorite_recipes"]
+
+# Create a new collection for user profiles
+user_profiles = db["user_profiles"]
 
 
 # Connect to MongoDB collections
@@ -327,7 +333,6 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     return ImageRecipeResponse(recipes=recipes_from_image)
 
 
-
 @app.get("/fridge/get_favorite_recipes")
 def get_favorite_recipes(user_id: str = Depends(get_current_user)):
     """
@@ -370,3 +375,56 @@ def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return {"message": f"Removed {recipe.title} from favorites"}
+
+# --- User Profile Endpoints --- #
+
+@app.get("/user/profile", response_model=UserProfile)
+def get_user_profile_info(profile_data = Depends(get_user_profile)):
+    """
+    Get the current user's profile information from the JWT token.
+    """
+    return UserProfile(
+        name=profile_data.get("name"),
+        email=profile_data.get("email"),
+        picture=profile_data.get("picture")
+    )
+
+@app.post("/user/update-profile-picture", response_model=UpdateProfileResponse)
+def update_profile_picture(
+    request: UpdateProfilePictureRequest, 
+    profile_data = Depends(get_user_profile)
+):
+    """
+    Update the user's profile picture URL in the database
+    """
+    user_id = profile_data["user_id"]
+    
+    try:
+        # Update or create the user profile document
+        result = user_profiles.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "picture": request.picture_url,
+                "name": profile_data.get("name"),
+                "email": profile_data.get("email")
+            }},
+            upsert=True
+        )
+        
+        # Create a UserProfile response object
+        updated_profile = UserProfile(
+            name=profile_data.get("name"),
+            email=profile_data.get("email"),
+            picture=request.picture_url
+        )
+        
+        return UpdateProfileResponse(
+            success=True,
+            message="Profile picture updated successfully",
+            profile=updated_profile
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating profile picture: {str(e)}"
+        )
