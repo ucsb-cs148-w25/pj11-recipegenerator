@@ -113,6 +113,18 @@ function FridgePage() {
   // New dropdown state
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
+  // Add search functionality
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter items based on search query
+  const filterItems = (items: FridgeItem[]): FridgeItem[] => {
+    if (!searchQuery.trim()) return items;
+
+    return items.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
   useEffect(() => {
     fetchItems();
 
@@ -472,37 +484,45 @@ function FridgePage() {
     }
   };
 
-  // The UI for a single fridge item.
-  const renderFridgeItemContent = (item: FridgeItem) => {
+  // Update the sorting function to work with the new sort types
+  const sortItems = (items: FridgeItem[]): FridgeItem[] => {
+    if (sortType === SortType.None) return items;
+
+    const sortedItems = [...items];
+
+    switch (sortType) {
+      case SortType.NameAZ:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        break;
+
+      case SortType.NameZA:
+        sortedItems.sort((a, b) => {
+          const nameA = a.name.toLowerCase();
+          const nameB = b.name.toLowerCase();
+          return nameB.localeCompare(nameA);
+        });
+        break;
+
+      case SortType.QuantityLowHigh:
+        sortedItems.sort((a, b) => a.quantity - b.quantity);
+        break;
+
+      case SortType.QuantityHighLow:
+        sortedItems.sort((a, b) => b.quantity - a.quantity);
+        break;
+    }
+
+    return sortedItems;
+  };
+
+  // Get the active sort option
+  const getActiveSortOption = (): SortOption => {
     return (
-      <View style={styles.ingredientItem}>
-        <Text style={styles.ingredientText}>{item.name}</Text>
-        <View style={styles.quantityControls}>
-          <TouchableOpacity
-            onPress={() => decrementQuantity(item.name, item.quantity)}
-          >
-            <Text style={styles.quantityButton}>-</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.quantityInput}
-            keyboardType="numeric"
-            value={
-              editingQuantity[item.name] !== undefined
-                ? editingQuantity[item.name]
-                : String(item.quantity)
-            }
-            onChangeText={(text) =>
-              setEditingQuantity({ ...editingQuantity, [item.name]: text })
-            }
-            onSubmitEditing={() => updateQuantity(item.name)}
-          />
-          <TouchableOpacity
-            onPress={() => incrementQuantity(item.name, item.quantity)}
-          >
-            <Text style={styles.quantityButton}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      sortOptions.find((option) => option.value === sortType) || sortOptions[0]
     );
   };
 
@@ -510,7 +530,34 @@ function FridgePage() {
   const renderItem = ({ item }: { item: FridgeItem }) => {
     return (
       <SwipeableItem onDelete={() => deleteItem(item)} borderRadius={10}>
-        {renderFridgeItemContent(item)}
+        <View style={styles.ingredientItem}>
+          <Text style={styles.ingredientText}>{item.name}</Text>
+          <View style={styles.quantityControls}>
+            <TouchableOpacity
+              onPress={() => decrementQuantity(item.name, item.quantity)}
+            >
+              <Text style={styles.quantityButton}>-</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="numeric"
+              value={
+                editingQuantity[item.name] !== undefined
+                  ? editingQuantity[item.name]
+                  : String(item.quantity)
+              }
+              onChangeText={(text) =>
+                setEditingQuantity({ ...editingQuantity, [item.name]: text })
+              }
+              onSubmitEditing={() => updateQuantity(item.name)}
+            />
+            <TouchableOpacity
+              onPress={() => incrementQuantity(item.name, item.quantity)}
+            >
+              <Text style={styles.quantityButton}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SwipeableItem>
     );
   };
@@ -696,48 +743,6 @@ function FridgePage() {
     );
   };
 
-  // Update the sorting function to work with the new sort types
-  const sortItems = (items: FridgeItem[]): FridgeItem[] => {
-    if (sortType === SortType.None) return items;
-
-    const sortedItems = [...items];
-
-    switch (sortType) {
-      case SortType.NameAZ:
-        sortedItems.sort((a, b) => {
-          const nameA = a.name.toLowerCase();
-          const nameB = b.name.toLowerCase();
-          return nameA.localeCompare(nameB);
-        });
-        break;
-
-      case SortType.NameZA:
-        sortedItems.sort((a, b) => {
-          const nameA = a.name.toLowerCase();
-          const nameB = b.name.toLowerCase();
-          return nameB.localeCompare(nameA);
-        });
-        break;
-
-      case SortType.QuantityLowHigh:
-        sortedItems.sort((a, b) => a.quantity - b.quantity);
-        break;
-
-      case SortType.QuantityHighLow:
-        sortedItems.sort((a, b) => b.quantity - a.quantity);
-        break;
-    }
-
-    return sortedItems;
-  };
-
-  // Get the active sort option
-  const getActiveSortOption = (): SortOption => {
-    return (
-      sortOptions.find((option) => option.value === sortType) || sortOptions[0]
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Fridge Inventory</Text>
@@ -759,6 +764,24 @@ function FridgePage() {
           </Text>
           <FontAwesome name="chevron-down" size={12} color="#088F8F" />
         </TouchableOpacity>
+      </View>
+
+      {/* Add Search Bar */}
+      <View style={styles.searchContainer}>
+        <FontAwesome name="search" size={16} color="#088F8F" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search ingredients..."
+          placeholderTextColor="#AAAAAA"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          clearButtonMode="while-editing"
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <FontAwesome name="times-circle" size={16} color="#088F8F" />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Sort Options Dropdown Modal */}
@@ -796,7 +819,7 @@ function FridgePage() {
                   style={[
                     styles.sortDropdownItemText,
                     sortType === option.value &&
-                      styles.sortDropdownItemTextActive,
+                    styles.sortDropdownItemTextActive,
                   ]}
                 >
                   {option.label}
@@ -807,9 +830,9 @@ function FridgePage() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Custom swipe-to-delete list with sorted items */}
+      {/* Custom swipe-to-delete list with sorted and filtered items */}
       <FlatList
-        data={sortItems(items)}
+        data={filterItems(sortItems(items))}
         keyExtractor={(item) => item.id || item.name}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 120 }}
@@ -821,7 +844,7 @@ function FridgePage() {
           style={[
             styles.cameraButton,
             currentTutorialStep === TutorialStep.ImageUpload &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
           onPress={handleCameraButtonPress}
         >
@@ -832,7 +855,7 @@ function FridgePage() {
           style={[
             styles.inputContainer,
             currentTutorialStep === TutorialStep.AddItem &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
         >
           <TextInput
@@ -856,7 +879,7 @@ function FridgePage() {
           style={[
             styles.floatingAddButton,
             currentTutorialStep === TutorialStep.AddItem &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
           onPress={addItem}
         >
@@ -872,7 +895,7 @@ function FridgePage() {
             styles.undoToast,
             { opacity: fadeAnimRef.current[itemName] || 1 },
             currentTutorialStep === TutorialStep.UndoDelete &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
         >
           <Text style={styles.undoText}>"{itemName}" removed</Text>
@@ -1393,6 +1416,31 @@ const styles = StyleSheet.create({
   sortDropdownItemTextActive: {
     color: "#FFF",
     fontWeight: "bold",
+  },
+  /* Add Search Bar */
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    color: "#333",
   },
 });
 

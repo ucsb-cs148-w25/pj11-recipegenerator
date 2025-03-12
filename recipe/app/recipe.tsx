@@ -10,19 +10,37 @@ import {
   Image,
   Switch,
   TextInput,
+  FlatList,
 } from "react-native";
 import { apiRequest } from "./api";
 
-function Recipe({ text, fetchSavedRecipes }) {
+// Define proper types to fix TypeScript errors
+interface RecipeItem {
+  text: string;
+}
+
+interface RecipeData {
+  name: string;
+  ingredients: string[] | string;
+  steps?: string;
+  detail?: string;
+}
+
+interface RecipeProps {
+  text: string;
+  fetchSavedRecipes: () => void;
+}
+
+function Recipe({ text, fetchSavedRecipes }: RecipeProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
 
   // Parse the JSON recipe data
-  let recipeData;
+  let recipeData: RecipeData;
   try {
     recipeData = JSON.parse(text);
   } catch (error) {
-    recipeData = { name: "Unknown Recipe", detail: text };
+    recipeData = { name: "Unknown Recipe", detail: text, ingredients: [] };
   }
 
   // Prepare ingredients content
@@ -95,7 +113,7 @@ function Recipe({ text, fetchSavedRecipes }) {
         title: recipeData.name,
         description: description,
         isFavorited: !isFavorited,
-      });
+      } as any); // Using type assertion to bypass strict typing temporarily
       console.log("Favorite toggle successful for:", recipeData.name);
       setIsFavorited(!isFavorited);
       // Removed fetchSavedRecipes() call here so that toggling favorites doesn't regenerate recipes.
@@ -141,42 +159,69 @@ function Recipe({ text, fetchSavedRecipes }) {
   );
 }
 
+// Define the preferences type
+interface RecipePreferences {
+  isVegan: boolean;
+  isSpicy: boolean;
+  cuisines: string[];
+  allergens: string[];
+  customCuisine: string;
+  customAllergen: string;
+  useOnlyFridgeIngredients: boolean;
+  cookingTime: string;
+  difficulty: string;
+}
+
 export default function RecipePage() {
-  const [recipes, setRecipes] = useState([]);
+  const [recipes, setRecipes] = useState<RecipeItem[]>([]);
   const [loading, setLoading] = useState(false);
   // Add preference visibility state
   const [preferencesVisible, setPreferencesVisible] = useState(false);
-  const [preferences, setPreferences] = useState({
+  const [preferences, setPreferences] = useState<RecipePreferences>({
     isVegan: false,
     isSpicy: false,
     cuisines: [],
     allergens: [],
     customCuisine: "",
     customAllergen: "",
+    // Add new filter options
+    useOnlyFridgeIngredients: false,
+    cookingTime: "any", // "any", "quick", "medium", "long"
+    difficulty: "any", // "any", "easy", "medium", "hard"
   });
 
   // Toggle an item in an array helper
-  const toggleArrayItem = (array, item) => {
+  const toggleArrayItem = (array: string[], item: string): string[] => {
     return array.includes(item)
-      ? array.filter((i) => i !== item)
+      ? array.filter((i: string) => i !== item)
       : [...array, item];
   };
 
-  // Update your generateRecipes function to hide preferences when generating
+  // Update your generateRecipes function to use the new filters
   const generateRecipes = async () => {
     setLoading(true);
     setPreferencesVisible(false); // Hide preferences when generating
 
     try {
-      // Pass preferences to the API
-      const data = await apiRequest("/fridge/generate_recipes", "POST", {
+      // Build the request payload with all filter options
+      const requestPayload = {
         isVegan: preferences.isVegan,
         isSpicy: preferences.isSpicy,
         cuisines: preferences.cuisines,
         allergens: preferences.allergens,
-      });
+        // Add new filter options
+        useOnlyFridgeIngredients: preferences.useOnlyFridgeIngredients,
+        cookingTime: preferences.cookingTime,
+        difficulty: preferences.difficulty,
+      };
+
+      console.log("Sending recipe request with preferences:", requestPayload);
+
+      // Pass preferences to the API
+      const data = await apiRequest("/fridge/generate_recipes", "POST", requestPayload as any);
+
       console.log("Received recipe data:", data);
-      let formattedRecipes = [];
+      let formattedRecipes: RecipeItem[] = [];
 
       // Case 1: Backend returns a single recipe object with keys "name", "ingredients", and "steps"
       if (data.name && data.ingredients && data.steps) {
@@ -190,13 +235,13 @@ export default function RecipePage() {
         if (data.recipe1) recipesArray.push(data.recipe1);
         if (data.recipe2) recipesArray.push(data.recipe2);
         if (data.recipe3) recipesArray.push(data.recipe3);
-        formattedRecipes = recipesArray.map((recipe) => ({
+        formattedRecipes = recipesArray.map((recipe: any) => ({
           text: typeof recipe === "object" ? JSON.stringify(recipe) : recipe,
         }));
       }
       // Case 3: Backend returns a single string under "recipes"
       else if (data.recipes && typeof data.recipes === "string") {
-        formattedRecipes = data.recipes.split("\n\n").map((recipe) => ({
+        formattedRecipes = data.recipes.split("\n\n").map((recipe: string) => ({
           text: recipe,
         }));
       }
@@ -240,248 +285,337 @@ export default function RecipePage() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Generated Recipes</Text>
-
-      {/* Main scrollable content area - just recipes */}
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContentContainer}
-      >
-        {/* Recipe list */}
-        <View style={styles.recipesListContainer}>
-          {recipes.length > 0 ? (
-            recipes.map((recipe, index) => (
-              <Recipe
-                key={index}
-                text={recipe.text}
-                fetchSavedRecipes={generateRecipes}
+      <Text style={styles.title}>Recipe Generator</Text>
+      <View style={styles.content}>
+        {recipes.length > 0 ? (
+          <FlatList
+            data={recipes}
+            renderItem={({ item }) => (
+              <Recipe text={item.text} fetchSavedRecipes={generateRecipes} />
+            )}
+            keyExtractor={(_, index) => `recipe-${index}`}
+            contentContainerStyle={styles.recipeList}
+          />
+        ) : (
+          <ScrollView style={styles.scrollView}>
+            <View style={styles.emptyState}>
+              <Image
+                source={require("../assets/images/recipe.png")}
+                style={styles.emptyStateImage}
               />
-            ))
-          ) : (
-            <Text style={styles.noRecipes}>
-              No recipes available. Generate some!
-            </Text>
-          )}
-        </View>
+              <Text style={styles.emptyStateText}>
+                No recipes yet. Use your ingredients from the fridge to generate
+                delicious recipes!
+              </Text>
+            </View>
 
-        {/* Add bottom padding to ensure content isn't hidden behind the fixed controls */}
-        <View style={styles.bottomPadding} />
-      </ScrollView>
+            {/* Preferences section - expandable */}
+            {preferencesVisible && (
+              <View style={styles.preferencesSection}>
+                <Text style={styles.preferencesTitle}>Customize Your Recipes</Text>
 
-      {/* Fixed bottom bar with preferences and generate button */}
-      <View style={styles.bottomControls}>
-        {/* Preferences section that expands upward when toggled */}
-        {preferencesVisible && (
-          <ScrollView style={styles.preferencesScrollContainer}>
-            <View style={styles.filtersContainer}>
-              <Text style={styles.filterTitle}>Preferences</Text>
-
-              <View style={styles.filterRow}>
-                <Text>Vegan</Text>
-                <Switch
-                  value={preferences.isVegan}
-                  onValueChange={(value) =>
-                    setPreferences({ ...preferences, isVegan: value })
-                  }
-                />
-              </View>
-
-              <View style={styles.filterRow}>
-                <Text>Spicy</Text>
-                <Switch
-                  value={preferences.isSpicy}
-                  onValueChange={(value) =>
-                    setPreferences({ ...preferences, isSpicy: value })
-                  }
-                />
-              </View>
-
-              {/* Cuisines section */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSubtitle}>Cuisines</Text>
-                <View style={styles.tagsContainer}>
-                  {preferences.cuisines.map((cuisine, index) => (
-                    <View style={styles.tagItem} key={index}>
-                      <Text style={styles.tagText}>{cuisine}</Text>
-                      <TouchableOpacity
-                        onPress={() =>
-                          setPreferences({
-                            ...preferences,
-                            cuisines: preferences.cuisines.filter(
-                              (_, i) => i !== index
-                            ),
-                          })
-                        }
-                      >
-                        <Text style={styles.tagRemove}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.cuisineButtons}>
-                  {[
-                    "American",
-                    "Italian",
-                    "Mexican",
-                    "Asian",
-                    "Indian",
-                    "Mediterranean",
-                    "French",
-                    "Janpanese",
-                  ].map((cuisine) => (
-                    <TouchableOpacity
-                      key={cuisine}
-                      style={[
-                        styles.cuisineButton,
-                        preferences.cuisines.includes(cuisine) &&
-                          styles.activeCuisineButton,
-                      ]}
-                      onPress={() =>
-                        setPreferences({
-                          ...preferences,
-                          cuisines: toggleArrayItem(
-                            preferences.cuisines,
-                            cuisine
-                          ),
-                        })
-                      }
-                    >
-                      <Text
-                        style={
-                          preferences.cuisines.includes(cuisine)
-                            ? styles.activeCuisineText
-                            : styles.cuisineText
-                        }
-                      >
-                        {cuisine}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Add custom cuisine */}
-                <View style={styles.customInputRow}>
-                  <TextInput
-                    style={styles.customInput}
-                    value={preferences.customCuisine}
-                    onChangeText={(text) =>
-                      setPreferences({ ...preferences, customCuisine: text })
+                {/* Ingredients Only Toggle */}
+                <View style={styles.preferenceRow}>
+                  <Text style={styles.preferenceLabel}>Use Only Fridge Ingredients:</Text>
+                  <Switch
+                    value={preferences.useOnlyFridgeIngredients}
+                    onValueChange={(value) =>
+                      setPreferences({
+                        ...preferences,
+                        useOnlyFridgeIngredients: value,
+                      })
                     }
-                    placeholder="Add custom cuisine..."
+                    trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+                    thumbColor={preferences.useOnlyFridgeIngredients ? "#088F8F" : "#f4f3f4"}
                   />
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={addCustomCuisine}
-                  >
-                    <Text style={styles.addButtonText}>Add</Text>
-                  </TouchableOpacity>
                 </View>
-              </View>
 
-              {/* Allergens section */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSubtitle}>Allergens to Avoid</Text>
-                <View style={styles.tagsContainer}>
-                  {preferences.allergens.map((allergen, index) => (
-                    <View style={styles.tagItem} key={index}>
-                      <Text style={styles.tagText}>{allergen}</Text>
+                {/* Cooking Time Filter */}
+                <View style={styles.preferenceSection}>
+                  <Text style={styles.preferenceSubtitle}>Cooking Time:</Text>
+                  <View style={styles.radioButtonsContainer}>
+                    {["any", "quick", "medium", "long"].map((option) => (
                       <TouchableOpacity
-                        onPress={() =>
-                          setPreferences({
-                            ...preferences,
-                            allergens: preferences.allergens.filter(
-                              (_, i) => i !== index
-                            ),
-                          })
-                        }
-                      >
-                        <Text style={styles.tagRemove}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.cuisineButtons}>
-                  {["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy"].map(
-                    (allergen) => (
-                      <TouchableOpacity
-                        key={allergen}
+                        key={option}
                         style={[
-                          styles.allergenButton,
-                          preferences.allergens.includes(allergen) &&
-                            styles.activeAllergenButton,
+                          styles.radioButton,
+                          preferences.cookingTime === option && styles.radioButtonActive,
                         ]}
                         onPress={() =>
                           setPreferences({
                             ...preferences,
-                            allergens: toggleArrayItem(
-                              preferences.allergens,
-                              allergen
+                            cookingTime: option,
+                          })
+                        }
+                      >
+                        <Text
+                          style={
+                            preferences.cookingTime === option
+                              ? styles.radioTextActive
+                              : styles.radioText
+                          }
+                        >
+                          {option === "any" ? "Any Time" :
+                            option === "quick" ? "< 30 mins" :
+                              option === "medium" ? "30-60 mins" :
+                                "> 60 mins"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Difficulty Filter */}
+                <View style={styles.preferenceSection}>
+                  <Text style={styles.preferenceSubtitle}>Difficulty Level:</Text>
+                  <View style={styles.radioButtonsContainer}>
+                    {["any", "easy", "medium", "hard"].map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          styles.radioButton,
+                          preferences.difficulty === option && styles.radioButtonActive,
+                        ]}
+                        onPress={() =>
+                          setPreferences({
+                            ...preferences,
+                            difficulty: option,
+                          })
+                        }
+                      >
+                        <Text
+                          style={
+                            preferences.difficulty === option
+                              ? styles.radioTextActive
+                              : styles.radioText
+                          }
+                        >
+                          {option === "any" ? "Any Level" :
+                            option === "easy" ? "Easy" :
+                              option === "medium" ? "Medium" :
+                                "Advanced"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Existing vegan and spicy preference toggles */}
+                <View style={styles.toggleRow}>
+                  <View style={[styles.toggleItem, { flex: 1.5 }]}>
+                    <Text style={styles.toggleLabel}>Vegan Only:</Text>
+                    <Switch
+                      value={preferences.isVegan}
+                      onValueChange={(value) =>
+                        setPreferences({ ...preferences, isVegan: value })
+                      }
+                      trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+                      thumbColor={preferences.isVegan ? "#088F8F" : "#f4f3f4"}
+                    />
+                  </View>
+                  <View style={[styles.toggleItem, { flex: 1 }]}>
+                    <Text style={styles.toggleLabel}>Spicy:</Text>
+                    <Switch
+                      value={preferences.isSpicy}
+                      onValueChange={(value) =>
+                        setPreferences({ ...preferences, isSpicy: value })
+                      }
+                      trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+                      thumbColor={preferences.isSpicy ? "#088F8F" : "#f4f3f4"}
+                    />
+                  </View>
+                </View>
+
+                {/* Existing cuisines and allergens sections */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSubtitle}>Cuisines</Text>
+                  <View style={styles.tagsContainer}>
+                    {preferences.cuisines.map((cuisine, index) => (
+                      <View style={styles.tagItem} key={index}>
+                        <Text style={styles.tagText}>{cuisine}</Text>
+                        <TouchableOpacity
+                          onPress={() =>
+                            setPreferences({
+                              ...preferences,
+                              cuisines: preferences.cuisines.filter(
+                                (_, i) => i !== index
+                              ),
+                            })
+                          }
+                        >
+                          <Text style={styles.tagRemove}>×</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.cuisineButtons}>
+                    {[
+                      "American",
+                      "Italian",
+                      "Mexican",
+                      "Asian",
+                      "Indian",
+                      "Mediterranean",
+                      "French",
+                      "Janpanese",
+                    ].map((cuisine) => (
+                      <TouchableOpacity
+                        key={cuisine}
+                        style={[
+                          styles.cuisineButton,
+                          preferences.cuisines.includes(cuisine) &&
+                          styles.activeCuisineButton,
+                        ]}
+                        onPress={() =>
+                          setPreferences({
+                            ...preferences,
+                            cuisines: toggleArrayItem(
+                              preferences.cuisines,
+                              cuisine
                             ),
                           })
                         }
                       >
                         <Text
                           style={
-                            preferences.allergens.includes(allergen)
-                              ? styles.activeAllergenText
-                              : styles.allergenText
+                            preferences.cuisines.includes(cuisine)
+                              ? styles.activeCuisineText
+                              : styles.cuisineText
                           }
                         >
-                          {allergen}
+                          {cuisine}
                         </Text>
                       </TouchableOpacity>
-                    )
-                  )}
+                    ))}
+                  </View>
+
+                  {/* Add custom cuisine */}
+                  <View style={styles.customInputRow}>
+                    <TextInput
+                      style={styles.customInput}
+                      value={preferences.customCuisine}
+                      onChangeText={(text) =>
+                        setPreferences({ ...preferences, customCuisine: text })
+                      }
+                      placeholder="Add custom cuisine..."
+                    />
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={addCustomCuisine}
+                    >
+                      <Text style={styles.addButtonText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                {/* Add custom allergen */}
-                <View style={styles.customInputRow}>
-                  <TextInput
-                    style={styles.customInput}
-                    value={preferences.customAllergen}
-                    onChangeText={(text) =>
-                      setPreferences({ ...preferences, customAllergen: text })
-                    }
-                    placeholder="Add custom allergen..."
-                  />
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={addCustomAllergen}
-                  >
-                    <Text style={styles.addButtonText}>Add</Text>
-                  </TouchableOpacity>
+                {/* Allergens section */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSubtitle}>Allergens to Avoid</Text>
+                  <View style={styles.tagsContainer}>
+                    {preferences.allergens.map((allergen, index) => (
+                      <View style={styles.tagItem} key={index}>
+                        <Text style={styles.tagText}>{allergen}</Text>
+                        <TouchableOpacity
+                          onPress={() =>
+                            setPreferences({
+                              ...preferences,
+                              allergens: preferences.allergens.filter(
+                                (_, i) => i !== index
+                              ),
+                            })
+                          }
+                        >
+                          <Text style={styles.tagRemove}>×</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.cuisineButtons}>
+                    {["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy"].map(
+                      (allergen) => (
+                        <TouchableOpacity
+                          key={allergen}
+                          style={[
+                            styles.allergenButton,
+                            preferences.allergens.includes(allergen) &&
+                            styles.activeAllergenButton,
+                          ]}
+                          onPress={() =>
+                            setPreferences({
+                              ...preferences,
+                              allergens: toggleArrayItem(
+                                preferences.allergens,
+                                allergen
+                              ),
+                            })
+                          }
+                        >
+                          <Text
+                            style={
+                              preferences.allergens.includes(allergen)
+                                ? styles.activeAllergenText
+                                : styles.allergenText
+                            }
+                          >
+                            {allergen}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    )}
+                  </View>
+
+                  {/* Add custom allergen */}
+                  <View style={styles.customInputRow}>
+                    <TextInput
+                      style={styles.customInput}
+                      value={preferences.customAllergen}
+                      onChangeText={(text) =>
+                        setPreferences({ ...preferences, customAllergen: text })
+                      }
+                      placeholder="Add custom allergen..."
+                    />
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={addCustomAllergen}
+                    >
+                      <Text style={styles.addButtonText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
           </ScrollView>
         )}
 
-        {/* Preference toggle button */}
-        <TouchableOpacity
-          style={styles.preferencesToggle}
-          onPress={() => setPreferencesVisible(!preferencesVisible)}
-        >
-          <Text style={styles.preferencesToggleText}>
-            {preferencesVisible ? "Hide Preferences" : "Show Preferences"}
-          </Text>
-          <Text style={styles.preferencesToggleIcon}>
-            {preferencesVisible ? "▼" : "▲"}
-          </Text>
-        </TouchableOpacity>
+        {/* Fixed Controls Container */}
+        <View style={styles.fixedControlsContainer}>
+          {/* Preference toggle button */}
+          <TouchableOpacity
+            style={styles.preferencesToggle}
+            onPress={() => setPreferencesVisible(!preferencesVisible)}
+          >
+            <Text style={styles.preferencesToggleText}>
+              {preferencesVisible ? "Hide Preferences" : "Show Preferences"}
+            </Text>
+            <Text style={styles.preferencesToggleIcon}>
+              {preferencesVisible ? "▼" : "▲"}
+            </Text>
+          </TouchableOpacity>
 
-        {/* Generate button */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={generateRecipes}
-          activeOpacity={0.8}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>Generate Recipes</Text>
-          )}
-        </TouchableOpacity>
+          {/* Generate button */}
+          <TouchableOpacity
+            style={styles.button}
+            onPress={generateRecipes}
+            activeOpacity={0.8}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>Generate Recipes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -500,40 +634,51 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 10,
   },
-  scrollContainer: {
+  content: {
     flex: 1,
+    position: 'relative',
   },
-  scrollContentContainer: {
+  recipeList: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 120, // Add bottom padding for fixed controls
   },
-  recipesListContainer: {
-    marginBottom: 10,
+  scrollView: {
+    padding: 20,
+    paddingBottom: 120, // Add bottom padding for fixed controls
   },
-  bottomPadding: {
-    height: 120, // Ensure there's enough space at the bottom for the fixed controls
+  emptyState: {
+    alignItems: "center",
+    marginTop: 40,
+    marginBottom: 20,
   },
-  bottomControls: {
-    position: "absolute",
+  emptyStateImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: "#888",
+    textAlign: "center",
+  },
+  fixedControlsContainer: {
+    position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#F6FFF7",
+    backgroundColor: '#F6FFF7',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 15,
-    paddingTop: 20,
-    elevation: 5,
+    borderTopColor: '#E0E0E0',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  preferencesScrollContainer: {
-    maxHeight: 350, // Limit the height of the preferences panel
-    marginBottom: 10,
+    shadowRadius: 5,
+    elevation: 5,
   },
   recipeCard: {
     backgroundColor: "white",
@@ -739,5 +884,89 @@ const styles = StyleSheet.create({
   tagRemove: {
     color: "#888",
     fontWeight: "bold",
+  },
+  preferencesSection: {
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 15,
+    marginVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  preferencesTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#088F8F",
+    marginBottom: 10,
+  },
+  preferenceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  preferenceLabel: {
+    fontSize: 16,
+    color: "#333",
+  },
+  preferenceSection: {
+    marginVertical: 10,
+  },
+  preferenceSubtitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#088F8F",
+    marginBottom: 10,
+  },
+  radioButtonsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+  },
+  radioButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F0F0F0",
+    marginRight: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  radioButtonActive: {
+    backgroundColor: "#088F8F",
+    borderColor: "#088F8F",
+  },
+  radioText: {
+    color: "#555",
+    fontSize: 14,
+  },
+  radioTextActive: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  toggleItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#088F8F",
+    marginRight: 10,
   },
 });

@@ -94,6 +94,27 @@ def generate_delicious_recipes(ingredients_list, preferences=None):
             allergens_list = ", ".join(preferences.get('allergens'))
             preferences_text += f"- User CANNOT have these allergens: {allergens_list}. DO NOT include these in any recipes.\n"
 
+        if preferences.get('cookingTime') and len(preferences.get('cookingTime')) > 0:
+            if preferences.get('cookingTime') == 'any':
+                preferences_text += "- User prefers recipes that can be made in any amount of time.\n"
+            elif preferences.get('cookingTime') == 'quick':
+                preferences_text += "- User prefers recipes that can be made in a short amount of time (less than 30 minutes).\n"
+            elif preferences.get('cookingTime') == 'medium':
+                preferences_text += "- User prefers recipes that can be made in a medium amount of time (about 30-60 minutes).\n"
+            elif preferences.get('cookingTime') == 'long':
+                preferences_text += "- User have enough time to make recipes that can take a long time to make (more than 60 minutes).\n"
+
+        if preferences.get('difficulty') and len(preferences.get('difficulty')) > 0:
+            if preferences.get('difficulty') == 'easy':
+                preferences_text += "- User prefers recipes that are easy to make.\n"
+            elif preferences.get('difficulty') == 'medium':
+                preferences_text += "- User prefers recipes that are medium difficulty to make.\n"
+            elif preferences.get('difficulty') == 'hard':
+                preferences_text += "- User prefers recipes requiring advanced cooking techniques.\n"
+        
+        if preferences.get('useOnlyFridgeIngredients', False):
+            preferences_text += "- User prefers recipes that only use ingredients available in their fridge.\n"
+
     # --- Step 4: Construct the user prompt to request recipes --- #
     prompt_text = (
         "You are a recipe creator. The user has the following ingredients in their freezer:\n"
