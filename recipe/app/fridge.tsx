@@ -10,6 +10,7 @@ import {
   FlatList,
   Alert,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -101,6 +102,8 @@ function FridgePage() {
   // Store the backend response data.
   const [detectedIngredients, setDetectedIngredients] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  // Add state for image uploading
+  const [isImageUploading, setIsImageUploading] = useState(false);
   const timersRef = useRef<TimerRefs>({});
   const fadeAnimRef = useRef<AnimationRefs>({});
 
@@ -127,7 +130,10 @@ function FridgePage() {
   // Add this effect at the component level, near other useEffect hooks
   useEffect(() => {
     // If we're on batch selection step 1 and batch mode is already active, skip to step 2
-    if (currentTutorialStep === TutorialStep.BatchSelectionFeature1 && batchMode) {
+    if (
+      currentTutorialStep === TutorialStep.BatchSelectionFeature1 &&
+      batchMode
+    ) {
       setCurrentTutorialStep(TutorialStep.BatchSelectionFeature2);
     }
   }, [currentTutorialStep, batchMode]);
@@ -136,7 +142,7 @@ function FridgePage() {
   const filterItems = (items: FridgeItem[]): FridgeItem[] => {
     if (!searchQuery.trim()) return items;
 
-    return items.filter(item =>
+    return items.filter((item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   };
@@ -449,6 +455,20 @@ function FridgePage() {
       return;
     }
 
+    // Set loading state to true
+    setIsImageUploading(true);
+
+    // Set a timeout to handle cases where the backend doesn't respond
+    const timeoutId = setTimeout(() => {
+      if (isImageUploading) {
+        setIsImageUploading(false);
+        Alert.alert(
+          "Processing Timeout",
+          "Image processing is taking longer than expected. Please try again."
+        );
+      }
+    }, 30000); // 30 second timeout
+
     // Convert the URI to a Blob (needed for web)
     let blob;
     try {
@@ -457,6 +477,8 @@ function FridgePage() {
     } catch (error) {
       console.error("Error converting image to blob:", error);
       Alert.alert("Error", "Could not process the image file.");
+      setIsImageUploading(false); // Reset loading state on error
+      clearTimeout(timeoutId); // Clear the timeout
       return;
     }
 
@@ -497,6 +519,10 @@ function FridgePage() {
     } catch (error) {
       console.error("Error uploading image:", error);
       Alert.alert("Upload Error", "There was an error uploading the image.");
+    } finally {
+      // Always reset loading state when done
+      setIsImageUploading(false);
+      clearTimeout(timeoutId); // Clear the timeout
     }
   };
 
@@ -553,9 +579,9 @@ function FridgePage() {
 
   // Toggle selection of an item
   const toggleItemSelection = (itemName: string) => {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       if (prev.includes(itemName)) {
-        return prev.filter(name => name !== itemName);
+        return prev.filter((name) => name !== itemName);
       } else {
         return [...prev, itemName];
       }
@@ -570,8 +596,8 @@ function FridgePage() {
     const itemsToDelete: { [key: string]: FridgeItem } = {};
     const itemIndices: { [key: string]: number } = {};
 
-    selectedItems.forEach(itemName => {
-      const itemIndex = items.findIndex(i => i.name === itemName);
+    selectedItems.forEach((itemName) => {
+      const itemIndex = items.findIndex((i) => i.name === itemName);
       const item = items[itemIndex];
       if (item) {
         itemsToDelete[itemName] = item;
@@ -582,7 +608,7 @@ function FridgePage() {
     // Update deleted items state for undo functionality
     const newDeletedItems = { ...deletedItems };
 
-    selectedItems.forEach(itemName => {
+    selectedItems.forEach((itemName) => {
       newDeletedItems[itemName] = {
         item: itemsToDelete[itemName],
         timestamp: Date.now(),
@@ -593,10 +619,12 @@ function FridgePage() {
     setDeletedItems(newDeletedItems);
 
     // Update UI immediately (optimistic update)
-    setItems(prev => prev.filter(item => !selectedItems.includes(item.name)));
+    setItems((prev) =>
+      prev.filter((item) => !selectedItems.includes(item.name))
+    );
 
     // Set up fade animations for each item
-    selectedItems.forEach(itemName => {
+    selectedItems.forEach((itemName) => {
       fadeAnimRef.current[itemName] = new Animated.Value(1);
 
       setTimeout(() => {
@@ -609,14 +637,14 @@ function FridgePage() {
     });
 
     // Set up deletion timers
-    selectedItems.forEach(itemName => {
+    selectedItems.forEach((itemName) => {
       timersRef.current[itemName] = setTimeout(async () => {
         try {
           await apiRequest("/fridge/remove", "POST", {
             name: itemName,
             quantity: 1000000000,
           } as any);
-          setDeletedItems(prev => {
+          setDeletedItems((prev) => {
             const updated = { ...prev };
             delete updated[itemName];
             return updated;
@@ -654,7 +682,14 @@ function FridgePage() {
               onPress={() => decrementQuantity(item.name, item.quantity)}
               disabled={batchMode}
             >
-              <Text style={[styles.quantityButton, batchMode && styles.disabledButton]}>-</Text>
+              <Text
+                style={[
+                  styles.quantityButton,
+                  batchMode && styles.disabledButton,
+                ]}
+              >
+                -
+              </Text>
             </TouchableOpacity>
             <TextInput
               style={styles.quantityInput}
@@ -674,7 +709,14 @@ function FridgePage() {
               onPress={() => incrementQuantity(item.name, item.quantity)}
               disabled={batchMode}
             >
-              <Text style={[styles.quantityButton, batchMode && styles.disabledButton]}>+</Text>
+              <Text
+                style={[
+                  styles.quantityButton,
+                  batchMode && styles.disabledButton,
+                ]}
+              >
+                +
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -748,9 +790,10 @@ function FridgePage() {
           <>
             <Text style={styles.tooltipTitle}>4. Search Ingredients</Text>
             <Text style={styles.tooltipText}>
-              <Text style={styles.actionText}>Try it now:</Text> Use the search bar
-              at the top to quickly find ingredients in your fridge. Just start typing
-              and the list will automatically filter to match your search.
+              <Text style={styles.actionText}>Try it now:</Text> Use the search
+              bar at the top to quickly find ingredients in your fridge. Just
+              start typing and the list will automatically filter to match your
+              search.
             </Text>
           </>
         );
@@ -766,9 +809,9 @@ function FridgePage() {
           <>
             <Text style={styles.tooltipTitle}>5. Sort Ingredients</Text>
             <Text style={styles.tooltipText}>
-              <Text style={styles.actionText}>Try it now:</Text> Tap the sort dropdown
-              on the right to organize your ingredients. You can sort by name (A-Z or Z-A)
-              or by quantity (low to high or high to low).
+              <Text style={styles.actionText}>Try it now:</Text> Tap the sort
+              dropdown on the right to organize your ingredients. You can sort
+              by name (A-Z or Z-A) or by quantity (low to high or high to low).
             </Text>
           </>
         );
@@ -784,9 +827,10 @@ function FridgePage() {
           <>
             <Text style={styles.tooltipTitle}>6. Batch Selection</Text>
             <Text style={styles.tooltipText}>
-              <Text style={styles.actionText}>Try it now:</Text> Tap "Select Multiple" to
-              enter batch mode. You can select several items at once and delete them all
-              with a single tap. Perfect for cleaning up your fridge!
+              <Text style={styles.actionText}>Try it now:</Text> Tap "Select
+              Multiple" to enter batch mode. You can select several items at
+              once and delete them all with a single tap. Perfect for cleaning
+              up your fridge!
             </Text>
           </>
         );
@@ -802,7 +846,8 @@ function FridgePage() {
           <>
             <Text style={styles.tooltipTitle}>6. Batch Selection</Text>
             <Text style={styles.tooltipText}>
-              <Text style={styles.actionText}>Try it now:</Text> Now you can select multiple items and delete them all with a single tap.
+              <Text style={styles.actionText}>Try it now:</Text> Now you can
+              select multiple items and delete them all with a single tap.
             </Text>
           </>
         );
@@ -939,11 +984,19 @@ function FridgePage() {
       <Text style={styles.title}>Fridge Inventory</Text>
 
       {/* Add Search Bar */}
-      <View style={[
-        styles.searchContainer,
-        currentTutorialStep === TutorialStep.SearchFeature && styles.highlightedElement
-      ]}>
-        <FontAwesome name="search" size={16} color="#088F8F" style={styles.searchIcon} />
+      <View
+        style={[
+          styles.searchContainer,
+          currentTutorialStep === TutorialStep.SearchFeature &&
+            styles.highlightedElement,
+        ]}
+      >
+        <FontAwesome
+          name="search"
+          size={16}
+          color="#088F8F"
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search ingredients..."
@@ -966,7 +1019,8 @@ function FridgePage() {
           style={[
             styles.batchModeButton,
             batchMode && styles.batchModeActiveButton,
-            currentTutorialStep === TutorialStep.BatchSelectionFeature1 && styles.highlightedElement
+            currentTutorialStep === TutorialStep.BatchSelectionFeature1 &&
+              styles.highlightedElement,
           ]}
           onPress={toggleBatchMode}
         >
@@ -985,7 +1039,8 @@ function FridgePage() {
         <TouchableOpacity
           style={[
             styles.sortDropdownButton,
-            currentTutorialStep === TutorialStep.SortFeature && styles.highlightedElement
+            currentTutorialStep === TutorialStep.SortFeature &&
+              styles.highlightedElement,
           ]}
           onPress={() => setShowSortDropdown(true)}
         >
@@ -1037,7 +1092,7 @@ function FridgePage() {
                   style={[
                     styles.sortDropdownItemText,
                     sortType === option.value &&
-                    styles.sortDropdownItemTextActive,
+                      styles.sortDropdownItemTextActive,
                   ]}
                 >
                   {option.label}
@@ -1063,18 +1118,23 @@ function FridgePage() {
             style={[
               styles.cameraButton,
               currentTutorialStep === TutorialStep.ImageUpload &&
-              styles.highlightedElement,
+                styles.highlightedElement,
             ]}
             onPress={handleCameraButtonPress}
+            disabled={isImageUploading}
           >
-            <FontAwesome name="camera" size={22} color="#088F8F" />
+            {isImageUploading ? (
+              <ActivityIndicator size="small" color="#088F8F" />
+            ) : (
+              <FontAwesome name="camera" size={22} color="#088F8F" />
+            )}
           </TouchableOpacity>
 
           <View
             style={[
               styles.inputContainer,
               currentTutorialStep === TutorialStep.AddItem &&
-              styles.highlightedElement,
+                styles.highlightedElement,
             ]}
           >
             <TextInput
@@ -1098,7 +1158,7 @@ function FridgePage() {
             style={[
               styles.floatingAddButton,
               currentTutorialStep === TutorialStep.AddItem &&
-              styles.highlightedElement,
+                styles.highlightedElement,
             ]}
             onPress={addItem}
           >
@@ -1109,12 +1169,16 @@ function FridgePage() {
 
       {/* Batch Action Bar - Floating at bottom */}
       {batchMode && selectedItems.length > 0 && (
-        <View style={[
-          styles.floatingBatchActionBar,
-          currentTutorialStep === TutorialStep.BatchSelectionFeature2 && styles.highlightedElement
-        ]}>
+        <View
+          style={[
+            styles.floatingBatchActionBar,
+            currentTutorialStep === TutorialStep.BatchSelectionFeature2 &&
+              styles.highlightedElement,
+          ]}
+        >
           <Text style={styles.floatingBatchSelectionCount}>
-            {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+            {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}{" "}
+            selected
           </Text>
           <TouchableOpacity
             style={styles.batchDeleteButton}
@@ -1134,11 +1198,12 @@ function FridgePage() {
             styles.undoToast,
             {
               opacity: fadeAnimRef.current[itemName] || 1,
-              bottom: (batchMode && selectedItems.length > 0 ? 100 : 70) +
-                Object.keys(deletedItems).indexOf(itemName) * 10 // Adjust position based on batch mode
+              bottom:
+                (batchMode && selectedItems.length > 0 ? 100 : 70) +
+                Object.keys(deletedItems).indexOf(itemName) * 10, // Adjust position based on batch mode
             },
             currentTutorialStep === TutorialStep.UndoDelete &&
-            styles.highlightedElement,
+              styles.highlightedElement,
           ]}
         >
           <Text style={styles.undoText}>"{itemName}" removed</Text>
@@ -1187,6 +1252,12 @@ function FridgePage() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
                 onPress={async () => {
                   for (const ingredient of detectedIngredients) {
                     let qty = 1;
@@ -1207,12 +1278,6 @@ function FridgePage() {
                 }}
               >
                 <Text style={styles.modalButtonText}>Yes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>No</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1239,6 +1304,19 @@ function FridgePage() {
             <FontAwesome name="hand-pointer-o" size={14} color="#088F8F" />{" "}
             Interact with the app during the tutorial!
           </Text>
+        </View>
+      )}
+
+      {/* Loading Overlay */}
+      {isImageUploading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#088F8F" />
+            <Text style={styles.loadingText}>Processing image...</Text>
+            <Text style={styles.loadingSubText}>
+              This may take a few moments as we analyze your ingredients.
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -1758,6 +1836,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "white",
     fontWeight: "600",
+  },
+  /* Loading Styles */
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingText: {
+    color: "#088F8F",
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  loadingSubText: {
+    color: "#666",
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 10,
+    maxWidth: 300,
   },
 });
 

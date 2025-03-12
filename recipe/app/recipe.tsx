@@ -138,7 +138,10 @@ function Recipe({ text, fetchSavedRecipes }: RecipeProps) {
             style={styles.favoriteIcon}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.recipeTitleContainer} onPress={() => setIsVisible(!isVisible)}>
+        <TouchableOpacity
+          style={styles.recipeTitleContainer}
+          onPress={() => setIsVisible(!isVisible)}
+        >
           <Text style={styles.recipeTitle}>{recipeData.name}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -224,7 +227,11 @@ export default function RecipePage() {
       console.log("Sending recipe request with preferences:", requestPayload);
 
       // Pass preferences to the API
-      const data = await apiRequest("/fridge/generate_recipes", "POST", requestPayload as any);
+      const data = await apiRequest(
+        "/fridge/generate_recipes",
+        "POST",
+        requestPayload as any
+      );
 
       console.log("Received recipe data:", data);
       let formattedRecipes: RecipeItem[] = [];
@@ -295,285 +302,6 @@ export default function RecipePage() {
       <View style={styles.content}>
         {recipes.length > 0 ? (
           <>
-            {/* Show preferences panel if visible, even when recipes are displayed */}
-            {preferencesVisible && (
-              <View style={styles.preferencesOverlay}>
-                <ScrollView style={styles.preferencesScrollView}>
-                  <View style={styles.preferencesSection}>
-                    <Text style={styles.preferencesTitle}>Customize Your Recipes</Text>
-
-                    {/* Ingredients Only Toggle */}
-                    <View style={styles.preferenceRow}>
-                      <Text style={styles.preferenceLabel}>Use Only Fridge Ingredients:</Text>
-                      <Switch
-                        value={preferences.useOnlyFridgeIngredients}
-                        onValueChange={(value) =>
-                          setPreferences({
-                            ...preferences,
-                            useOnlyFridgeIngredients: value,
-                          })
-                        }
-                        trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
-                        thumbColor={preferences.useOnlyFridgeIngredients ? "#088F8F" : "#f4f3f4"}
-                      />
-                    </View>
-
-                    {/* Cooking Time Filter */}
-                    <View style={styles.preferenceSection}>
-                      <Text style={styles.preferenceSubtitle}>Cooking Time:</Text>
-                      <View style={styles.radioButtonsContainer}>
-                        {["any", "quick", "medium", "long"].map((option) => (
-                          <TouchableOpacity
-                            key={option}
-                            style={[
-                              styles.radioButton,
-                              preferences.cookingTime === option && styles.radioButtonActive,
-                            ]}
-                            onPress={() =>
-                              setPreferences({
-                                ...preferences,
-                                cookingTime: option,
-                              })
-                            }
-                          >
-                            <Text
-                              style={
-                                preferences.cookingTime === option
-                                  ? styles.radioTextActive
-                                  : styles.radioText
-                              }
-                            >
-                              {option === "any" ? "Any Time" :
-                                option === "quick" ? "< 30 mins" :
-                                  option === "medium" ? "30-60 mins" :
-                                    "> 60 mins"}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    {/* Difficulty Filter */}
-                    <View style={styles.preferenceSection}>
-                      <Text style={styles.preferenceSubtitle}>Difficulty Level:</Text>
-                      <View style={styles.radioButtonsContainer}>
-                        {["any", "easy", "medium", "hard"].map((option) => (
-                          <TouchableOpacity
-                            key={option}
-                            style={[
-                              styles.radioButton,
-                              preferences.difficulty === option && styles.radioButtonActive,
-                            ]}
-                            onPress={() =>
-                              setPreferences({
-                                ...preferences,
-                                difficulty: option,
-                              })
-                            }
-                          >
-                            <Text
-                              style={
-                                preferences.difficulty === option
-                                  ? styles.radioTextActive
-                                  : styles.radioText
-                              }
-                            >
-                              {option === "any" ? "Any Level" :
-                                option === "easy" ? "Easy" :
-                                  option === "medium" ? "Medium" :
-                                    "Advanced"}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    {/* Existing vegan and spicy preference toggles */}
-                    <View style={styles.toggleRow}>
-                      <View style={[styles.toggleItem, { flex: 1.5 }]}>
-                        <Text style={styles.toggleLabel}>Vegan Only:</Text>
-                        <Switch
-                          value={preferences.isVegan}
-                          onValueChange={(value) =>
-                            setPreferences({ ...preferences, isVegan: value })
-                          }
-                          trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
-                          thumbColor={preferences.isVegan ? "#088F8F" : "#f4f3f4"}
-                        />
-                      </View>
-                      <View style={[styles.toggleItem, { flex: 1 }]}>
-                        <Text style={styles.toggleLabel}>Spicy:</Text>
-                        <Switch
-                          value={preferences.isSpicy}
-                          onValueChange={(value) =>
-                            setPreferences({ ...preferences, isSpicy: value })
-                          }
-                          trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
-                          thumbColor={preferences.isSpicy ? "#088F8F" : "#f4f3f4"}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Existing cuisines and allergens sections */}
-                    <View style={styles.filterSection}>
-                      <Text style={styles.filterSubtitle}>Cuisines</Text>
-                      <View style={styles.tagsContainer}>
-                        {preferences.cuisines.map((cuisine, index) => (
-                          <View style={styles.tagItem} key={index}>
-                            <Text style={styles.tagText}>{cuisine}</Text>
-                            <TouchableOpacity
-                              onPress={() =>
-                                setPreferences({
-                                  ...preferences,
-                                  cuisines: preferences.cuisines.filter(
-                                    (_, i) => i !== index
-                                  ),
-                                })
-                              }
-                            >
-                              <Text style={styles.tagRemove}>×</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                      <View style={styles.cuisineButtons}>
-                        {[
-                          "American",
-                          "Italian",
-                          "Mexican",
-                          "Asian",
-                          "Indian",
-                          "Mediterranean",
-                          "French",
-                          "Janpanese",
-                        ].map((cuisine) => (
-                          <TouchableOpacity
-                            key={cuisine}
-                            style={[
-                              styles.cuisineButton,
-                              preferences.cuisines.includes(cuisine) &&
-                              styles.activeCuisineButton,
-                            ]}
-                            onPress={() =>
-                              setPreferences({
-                                ...preferences,
-                                cuisines: toggleArrayItem(
-                                  preferences.cuisines,
-                                  cuisine
-                                ),
-                              })
-                            }
-                          >
-                            <Text
-                              style={
-                                preferences.cuisines.includes(cuisine)
-                                  ? styles.activeCuisineText
-                                  : styles.cuisineText
-                              }
-                            >
-                              {cuisine}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-
-                      {/* Add custom cuisine */}
-                      <View style={styles.customInputRow}>
-                        <TextInput
-                          style={styles.customInput}
-                          value={preferences.customCuisine}
-                          onChangeText={(text) =>
-                            setPreferences({ ...preferences, customCuisine: text })
-                          }
-                          placeholder="Add custom cuisine..."
-                        />
-                        <TouchableOpacity
-                          style={styles.addButton}
-                          onPress={addCustomCuisine}
-                        >
-                          <Text style={styles.addButtonText}>Add</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Allergens section */}
-                    <View style={styles.filterSection}>
-                      <Text style={styles.filterSubtitle}>Allergens to Avoid</Text>
-                      <View style={styles.tagsContainer}>
-                        {preferences.allergens.map((allergen, index) => (
-                          <View style={styles.tagItem} key={index}>
-                            <Text style={styles.tagText}>{allergen}</Text>
-                            <TouchableOpacity
-                              onPress={() =>
-                                setPreferences({
-                                  ...preferences,
-                                  allergens: preferences.allergens.filter(
-                                    (_, i) => i !== index
-                                  ),
-                                })
-                              }
-                            >
-                              <Text style={styles.tagRemove}>×</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                      <View style={styles.cuisineButtons}>
-                        {["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy"].map(
-                          (allergen) => (
-                            <TouchableOpacity
-                              key={allergen}
-                              style={[
-                                styles.allergenButton,
-                                preferences.allergens.includes(allergen) &&
-                                styles.activeAllergenButton,
-                              ]}
-                              onPress={() =>
-                                setPreferences({
-                                  ...preferences,
-                                  allergens: toggleArrayItem(
-                                    preferences.allergens,
-                                    allergen
-                                  ),
-                                })
-                              }
-                            >
-                              <Text
-                                style={
-                                  preferences.allergens.includes(allergen)
-                                    ? styles.activeAllergenText
-                                    : styles.allergenText
-                                }
-                              >
-                                {allergen}
-                              </Text>
-                            </TouchableOpacity>
-                          )
-                        )}
-                      </View>
-
-                      {/* Add custom allergen */}
-                      <View style={styles.customInputRow}>
-                        <TextInput
-                          style={styles.customInput}
-                          value={preferences.customAllergen}
-                          onChangeText={(text) =>
-                            setPreferences({ ...preferences, customAllergen: text })
-                          }
-                          placeholder="Add custom allergen..."
-                        />
-                        <TouchableOpacity
-                          style={styles.addButton}
-                          onPress={addCustomAllergen}
-                        >
-                          <Text style={styles.addButtonText}>Add</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </ScrollView>
-              </View>
-            )}
             <FlatList
               data={recipes}
               renderItem={({ item }) => (
@@ -595,15 +323,23 @@ export default function RecipePage() {
                 delicious recipes!
               </Text>
             </View>
+          </ScrollView>
+        )}
 
-            {/* Keep the preferences panel here for the empty state */}
-            {preferencesVisible && (
-              <View style={[styles.preferencesSection, { backgroundColor: 'rgba(246, 255, 247, 0.5)' }]}>
-                <Text style={styles.preferencesTitle}>Customize Your Recipes</Text>
+        {/* Shared Preferences Overlay for both states */}
+        {preferencesVisible && (
+          <View style={styles.preferencesOverlay}>
+            <ScrollView style={styles.preferencesScrollView}>
+              <View style={styles.preferencesSection}>
+                <Text style={styles.preferencesTitle}>
+                  Customize Your Recipes
+                </Text>
 
                 {/* Ingredients Only Toggle */}
                 <View style={styles.preferenceRow}>
-                  <Text style={styles.preferenceLabel}>Use Only Fridge Ingredients:</Text>
+                  <Text style={styles.preferenceLabel}>
+                    Only Use Fridge Ingredients
+                  </Text>
                   <Switch
                     value={preferences.useOnlyFridgeIngredients}
                     onValueChange={(value) =>
@@ -613,7 +349,11 @@ export default function RecipePage() {
                       })
                     }
                     trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
-                    thumbColor={preferences.useOnlyFridgeIngredients ? "#088F8F" : "#f4f3f4"}
+                    thumbColor={
+                      preferences.useOnlyFridgeIngredients
+                        ? "#088F8F"
+                        : "#f4f3f4"
+                    }
                   />
                 </View>
 
@@ -626,7 +366,8 @@ export default function RecipePage() {
                         key={option}
                         style={[
                           styles.radioButton,
-                          preferences.cookingTime === option && styles.radioButtonActive,
+                          preferences.cookingTime === option &&
+                            styles.radioButtonActive,
                         ]}
                         onPress={() =>
                           setPreferences({
@@ -642,10 +383,13 @@ export default function RecipePage() {
                               : styles.radioText
                           }
                         >
-                          {option === "any" ? "Any Time" :
-                            option === "quick" ? "< 30 mins" :
-                              option === "medium" ? "30-60 mins" :
-                                "> 60 mins"}
+                          {option === "any"
+                            ? "Any Time"
+                            : option === "quick"
+                            ? "< 30 mins"
+                            : option === "medium"
+                            ? "30-60 mins"
+                            : "> 60 mins"}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -654,14 +398,17 @@ export default function RecipePage() {
 
                 {/* Difficulty Filter */}
                 <View style={styles.preferenceSection}>
-                  <Text style={styles.preferenceSubtitle}>Difficulty Level:</Text>
+                  <Text style={styles.preferenceSubtitle}>
+                    Difficulty Level:
+                  </Text>
                   <View style={styles.radioButtonsContainer}>
                     {["any", "easy", "medium", "hard"].map((option) => (
                       <TouchableOpacity
                         key={option}
                         style={[
                           styles.radioButton,
-                          preferences.difficulty === option && styles.radioButtonActive,
+                          preferences.difficulty === option &&
+                            styles.radioButtonActive,
                         ]}
                         onPress={() =>
                           setPreferences({
@@ -677,10 +424,13 @@ export default function RecipePage() {
                               : styles.radioText
                           }
                         >
-                          {option === "any" ? "Any Level" :
-                            option === "easy" ? "Easy" :
-                              option === "medium" ? "Medium" :
-                                "Advanced"}
+                          {option === "any"
+                            ? "Any Level"
+                            : option === "easy"
+                            ? "Easy"
+                            : option === "medium"
+                            ? "Medium"
+                            : "Advanced"}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -751,7 +501,7 @@ export default function RecipePage() {
                         style={[
                           styles.cuisineButton,
                           preferences.cuisines.includes(cuisine) &&
-                          styles.activeCuisineButton,
+                            styles.activeCuisineButton,
                         ]}
                         onPress={() =>
                           setPreferences({
@@ -818,37 +568,42 @@ export default function RecipePage() {
                     ))}
                   </View>
                   <View style={styles.cuisineButtons}>
-                    {["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy"].map(
-                      (allergen) => (
-                        <TouchableOpacity
-                          key={allergen}
-                          style={[
-                            styles.allergenButton,
-                            preferences.allergens.includes(allergen) &&
+                    {[
+                      "Nuts",
+                      "Dairy",
+                      "Gluten",
+                      "Shellfish",
+                      "Eggs",
+                      "Soy",
+                    ].map((allergen) => (
+                      <TouchableOpacity
+                        key={allergen}
+                        style={[
+                          styles.allergenButton,
+                          preferences.allergens.includes(allergen) &&
                             styles.activeAllergenButton,
-                          ]}
-                          onPress={() =>
-                            setPreferences({
-                              ...preferences,
-                              allergens: toggleArrayItem(
-                                preferences.allergens,
-                                allergen
-                              ),
-                            })
+                        ]}
+                        onPress={() =>
+                          setPreferences({
+                            ...preferences,
+                            allergens: toggleArrayItem(
+                              preferences.allergens,
+                              allergen
+                            ),
+                          })
+                        }
+                      >
+                        <Text
+                          style={
+                            preferences.allergens.includes(allergen)
+                              ? styles.activeAllergenText
+                              : styles.allergenText
                           }
                         >
-                          <Text
-                            style={
-                              preferences.allergens.includes(allergen)
-                                ? styles.activeAllergenText
-                                : styles.allergenText
-                            }
-                          >
-                            {allergen}
-                          </Text>
-                        </TouchableOpacity>
-                      )
-                    )}
+                          {allergen}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
 
                   {/* Add custom allergen */}
@@ -870,8 +625,8 @@ export default function RecipePage() {
                   </View>
                 </View>
               </View>
-            )}
-          </ScrollView>
+            </ScrollView>
+          </View>
         )}
 
         {/* Fixed Controls Container */}
@@ -923,7 +678,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
   },
   recipeList: {
     paddingHorizontal: 20,
@@ -949,16 +704,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   fixedControlsContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#F6FFF7',
+    backgroundColor: "#F6FFF7",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     shadowColor: "#000",
@@ -998,8 +753,8 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   recipeTitleContainer: {
     flex: 1,
@@ -1149,7 +904,7 @@ const styles = StyleSheet.create({
   },
   allergenButton: {
     backgroundColor: "#e0e0e0",
-    padding: 10,    
+    padding: 10,
     borderRadius: 10,
     marginRight: 10,
     marginBottom: 10,
@@ -1200,7 +955,7 @@ const styles = StyleSheet.create({
   },
   preferencesSection: {
     padding: 15,
-    backgroundColor: 'rgba(246, 255, 247, 0.5)', // A stronger light green but not as bright as white
+    backgroundColor: "rgba(246, 255, 247, 0.5)", // A stronger light green but not as bright as white
     borderRadius: 15,
     marginVertical: 10,
     shadowColor: "#000",
@@ -1284,12 +1039,12 @@ const styles = StyleSheet.create({
   },
   // New styles for the overlay preferences panel
   preferencesOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 80, // Adjusted to leave more room for the controls
-    backgroundColor: 'rgba(246, 255, 247, 0.98)', // Light green with opacity
+    backgroundColor: "rgba(246, 255, 247, 0.98)", // Light green with opacity
     zIndex: 10,
     borderRadius: 15,
   },
