@@ -89,7 +89,7 @@ Once the Expo server is running, you can:
 #### A. Set Up Virtual Environment (Recommended)
 ```bash
 # Navigate to the backend directory
-cd app
+cd backend
 
 # Create a virtual environment
 python -m venv venv
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 ```
 
 #### C. Environment Variables
-Create a `.env` file in the `app` directory with the following variables:
+Create a `.env` file in the root directory with the following variables:
 ```
 MONGODB_URI=your_mongodb_connection_string
 OPENAI_API_KEY=your_openai_api_key

@@ -16,8 +16,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Secret key for signing your JWT
 # Replace with a secure, random value in production (from an .env file, etc.)
-SECRET_KEY = "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"
-ALGORITHM = "HS256"
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get secret key and algorithm from environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 # The data we expect in the request body
 class GoogleLoginPayload(BaseModel):

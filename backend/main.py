@@ -1,6 +1,6 @@
 """
 This file defines the main FastAPI application for the fridge management project.
-Here, we integrate the Pydantic models from backend/models.py into our endpoints 
+Here, we integrate the Pydantic models from app/models.py into our endpoints 
 to provide strongly typed request/response handling and better documentation.
 
 We also define a new endpoint for handling image uploads and converting them
@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import login
 from pydantic import BaseModel
 import os
-
+from dotenv import load_dotenv
 
 # Import `get_current_user` from `login.py`
 from backend.routers.login import get_current_user, get_user_profile
@@ -27,7 +27,7 @@ from backend.routers.login import get_current_user, get_user_profile
 # Import the ML functions
 from backend.ML_functions import generate_delicious_recipes, extract_recipe_from_image
 
-# Import the Pydantic models from backend/models.py 
+# Import the Pydantic models from app/models.py 
 from backend.models import (
     OpeningPageResponse,
     Item, 
@@ -47,8 +47,16 @@ from backend.models import (
 )
 
 # MongoDB URI
-# uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
-uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get MongoDB URI from environment variables
+uri = os.getenv("MONGODB_URI")
+
+# Check if the URI is available
+if not uri:
+    raise ValueError("MONGODB_URI environment variable is not set. Please check your .env file.")
 client = MongoClient(uri, server_api=ServerApi('1'))
 
 # Connect to the database and collection
@@ -65,7 +73,6 @@ favorite_recipes = db["favorite_recipes"]
 # Create a new collection for user profiles
 user_profiles = db["user_profiles"]
 
-
 # Connect to MongoDB collections
 favorite_recipes = db["favorite_recipes"]
 
@@ -73,20 +80,20 @@ favorite_recipes = db["favorite_recipes"]
 # 1) Configure the FastAPI instance so that docs_url="/" serves the Swagger UI.
 #    We also set openapi_url and redoc_url to maintain or omit as desired.
 # -----------------------------------------------------------------------------
-backend = FastAPI(
+app = FastAPI(
     docs_url="/",                 # Serve the Swagger docs at the root URL
     openapi_url="/openapi.json",  # Keep the OpenAPI specification accessible
     redoc_url="/redoc"            # Keep or remove ReDoc by setting it to None
 )
 
-backend.include_router(login.router)
+app.include_router(login.router)
 
-# Secret Key
-SECRET_KEY = "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"
-ALGORITHM = "HS256"
+# Load secret key and algorithm from environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 
-backend.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins (change this later for security)
     allow_credentials=True,
@@ -117,17 +124,17 @@ except Exception as e:
 
 # -----------------------------------------------------------------------------
 # 2) Remove or rename the existing root endpoint to avoid conflicts.
-#    If you want a 'root' endpoint, rename it for example to @backend.get("/welcome").
+#    If you want a 'root' endpoint, rename it for example to @app.get("/welcome").
 # -----------------------------------------------------------------------------
-@backend.get("/welcome", response_model=OpeningPageResponse)
+@app.get("/welcome", response_model=OpeningPageResponse)
 def opening_page():
     """
     Replaces the old root endpoint.
     Returns a welcome message at /welcome instead of /.
     """
-    return OpeningPageResponse(Message="Welcome to the fridge backend!")
+    return OpeningPageResponse(Message="Welcome to the fridge app!")
 
-@backend.get("/fridge/get", response_model=list[FridgeItem])
+@app.get("/fridge/get", response_model=list[FridgeItem])
 def get_items(user_id: str = Depends(get_current_user)):
     """
     Retrieve all items in the fridge. Each item is represented 
@@ -139,7 +146,7 @@ def get_items(user_id: str = Depends(get_current_user)):
     # Convert each MongoDB document into a FridgeItem using unpack_item
     return [unpack_item(item) for item in items_cursor]
 
-@backend.post("/fridge/add", response_model=AddItemResponse)
+@app.post("/fridge/add", response_model=AddItemResponse)
 def add_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Add an item to the fridge for the current user.
@@ -157,7 +164,7 @@ def add_item(item: Item, user_id: str = Depends(get_current_user)):
         all_items=all_items_fridge
     )
 
-@backend.post("/fridge/remove", response_model=RemoveItemResponse)
+@app.delete("/fridge/remove", response_model=RemoveItemResponse)
 def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Remove an item from the fridge for the current user.
@@ -188,7 +195,7 @@ def remove_item(item: Item, user_id: str = Depends(get_current_user)):
         all_items=get_items(user_id)
     )
 
-@backend.post("/fridge/update_quantity", response_model=UpdateItemResponse)
+@app.put("/fridge/update_quantity", response_model=UpdateItemResponse)
 def update_quantity(item: Item, user_id: str = Depends(get_current_user)):
     """
     Update the quantity of an item in the fridge for the current user.
@@ -212,7 +219,7 @@ def update_quantity(item: Item, user_id: str = Depends(get_current_user)):
         all_items=get_items(user_id)
     )
 
-@backend.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
+@app.get("/fridge/suggestions", response_model=GenerateSuggestionsResponse)
 def generate_suggestions(user_id: str = Depends(get_current_user)):
     """
     Generate item-based suggestions based on what is currently in the fridge. 
@@ -233,7 +240,7 @@ def generate_suggestions(user_id: str = Depends(get_current_user)):
 
     return GenerateSuggestionsResponse(suggestions=suggestions)
 
-@backend.post("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
+@app.post("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
 def generate_recipes(preferences: RecipePreferences, user_id: str = Depends(get_current_user)):
     """
     Generate three recipe suggestions based on current fridge contents and user preferences 
@@ -263,7 +270,7 @@ def generate_recipes(preferences: RecipePreferences, user_id: str = Depends(get_
             detail=f"Error generating recipes: {str(e)}"
         )
 
-@backend.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
+@app.get("/fridge/generate_recipes", response_model=GenerateRecipesResponse)
 def generate_recipes_get(user_id: str = Depends(get_current_user)):
     """
     Legacy GET endpoint for backward compatibility.
@@ -275,7 +282,7 @@ def generate_recipes_get(user_id: str = Depends(get_current_user)):
     # Call the POST version with empty preferences
     return generate_recipes(empty_preferences, user_id)
 
-@backend.post("/fridge/load_from_image", response_model=ImageRecipeResponse)
+@app.post("/fridge/load_from_image", response_model=ImageRecipeResponse)
 async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     """
     Accepts an image file in the request body (JPEG, PNG, etc.) and uses the ML function
@@ -333,7 +340,7 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     return ImageRecipeResponse(recipes=recipes_from_image)
 
 
-@backend.get("/fridge/get_favorite_recipes")
+@app.get("/fridge/get_favorite_recipes")
 def get_favorite_recipes(user_id: str = Depends(get_current_user)):
     """
     Retrieve all favorite recipes for the current user.
@@ -349,7 +356,7 @@ def get_favorite_recipes(user_id: str = Depends(get_current_user)):
     ]
     return favorite_recipes_list
 
-@backend.post("/recipes/favorite")
+@app.post("/recipes/favorite")
 def favorite_recipe(recipe: FavoriteRecipe, user_id: str = Depends(get_current_user)):
     """
     Add or remove a recipe from favorites for the current user.
@@ -366,7 +373,7 @@ def favorite_recipe(recipe: FavoriteRecipe, user_id: str = Depends(get_current_u
         favorite_recipes.delete_one({"user_id": user_id, "title": recipe.title})
         return {"message": f"Removed {recipe.title} from favorites"}
 
-@backend.post("/fridge/remove_favorite_recipe")
+@app.post("/fridge/remove_favorite_recipe")
 def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends(get_current_user)):
     """
     Remove a favorite recipe by title for the current user.
@@ -378,7 +385,7 @@ def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends
 
 # --- User Profile Endpoints --- #
 
-@backend.get("/user/profile", response_model=UserProfile)
+@app.get("/user/profile", response_model=UserProfile)
 def get_user_profile_info(profile_data = Depends(get_user_profile)):
     """
     Get the current user's profile information from the JWT token.
@@ -389,7 +396,7 @@ def get_user_profile_info(profile_data = Depends(get_user_profile)):
         picture=profile_data.get("picture")
     )
 
-@backend.post("/user/update-profile-picture", response_model=UpdateProfileResponse)
+@app.post("/user/update-profile-picture", response_model=UpdateProfileResponse)
 def update_profile_picture(
     request: UpdateProfilePictureRequest, 
     profile_data = Depends(get_user_profile)

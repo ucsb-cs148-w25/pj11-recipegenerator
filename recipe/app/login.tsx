@@ -121,8 +121,21 @@ export default function Login({ setUser }: LoginProps) {
           picture: result.user.photo || undefined,
         };
 
-        setUser(userData);
-        const backendResponse = await sendUserDataToBackend(userData);
+        try {
+          // Wait for backend to verify and provide a JWT token
+          const backendResponse = await sendUserDataToBackend(userData);
+
+          // Make sure token is fully saved before updating the user state
+          // Add a small delay to ensure AsyncStorage operations are completed
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Now that we have the token saved, set the user
+          console.log("Backend token stored, now setting user state");
+          setUser(userData);
+        } catch (error) {
+          console.error("Error from backend:", error);
+          Alert.alert("Login Error", "There was a problem connecting to the server. Please try again.");
+        }
       } else {
         console.error("No user info returned. Full info:", info);
         Alert.alert(
@@ -192,11 +205,25 @@ export default function Login({ setUser }: LoginProps) {
         email: user.email || undefined,
         picture: user.picture || undefined,
       };
-      setUser(userData);
 
-      const backendResponse = await sendUserDataToBackend(userData);
+      try {
+        // Wait for backend to verify and provide a JWT token
+        const backendResponse = await sendUserDataToBackend(userData);
+
+        // Make sure token is fully saved before updating the user state
+        // Add a small delay to ensure AsyncStorage operations are completed
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Now that we have the token saved, set the user
+        console.log("Backend token stored, now setting user state");
+        setUser(userData);
+      } catch (error) {
+        console.error("Error from backend:", error);
+        Alert.alert("Login Error", "There was a problem connecting to the server. Please try again.");
+      }
     } catch (error) {
       console.error("Failed to authenticate user:", error);
+      Alert.alert("Authentication Error", "Failed to get user information from Google.");
     }
   };
 

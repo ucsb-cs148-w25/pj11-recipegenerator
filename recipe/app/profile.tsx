@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useState, useEffect, Dispatch, SetStateAction } from "react";
 import { User } from "./login";
@@ -35,7 +36,6 @@ interface Friend {
 
 // This would be an actual API call in a real app
 const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
-  // Simulating an API call that sends the updated user profile to the backend
   console.log("Sending updated profile to backend:", user);
 
   try {
@@ -45,9 +45,14 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
       return true; // Return success for guest users
     }
 
+    // Use the correct backend URL based on the environment
+    const backendUrl = Platform.OS === 'web'
+      ? 'http://localhost:8000'
+      : 'http://10.0.2.2:8000'; // Use 10.0.2.2 for Android emulator, or your machine's IP for real devices
+
     // Send the profile picture URL to our backend API
     const response = await fetch(
-      "http://localhost:8000/user/update-profile-picture",
+      `${backendUrl}/user/update-profile-picture`,
       {
         method: "POST",
         headers: {
@@ -61,17 +66,26 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
     );
 
     if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Backend error:", errorData);
       throw new Error(
-        `Failed to update profile picture: ${response.status} ${response.statusText}`
+        errorData.detail || `Failed to update profile picture: ${response.status} ${response.statusText}`
       );
     }
 
     const result = await response.json();
     console.log("Profile update response:", result);
+
+    // Update AsyncStorage with the new picture URL from the backend response
+    if (result.profile?.picture) {
+      await AsyncStorage.setItem("userPicture", result.profile.picture);
+      console.log("Updated profile picture in AsyncStorage:", result.profile.picture);
+    }
+
     return result.success;
   } catch (error) {
     console.error("Error sending profile update to backend:", error);
-    return false;
+    throw error; // Re-throw to handle in the calling function
   }
 };
 
@@ -128,8 +142,6 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         "Blueberry Pancakes",
         "Iced Latte",
       ],
-      picture:
-        "https://media.glamourmagazine.co.uk/photos/660ce2a45dafab43b17dee58/4:3/w_1920,h_1440,c_limit/CHAPPELL%20ROAN%20MAKEUP%20ROUTINE%2011062024%20N_sf.jpg",
     },
     {
       id: "2",
@@ -140,32 +152,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       id: "3",
       name: "Tobias Hollerer",
       recipes: ["Margherita Pizza", "Pumpkin Soup", "Grilled Salmon"],
-      picture:
-        "https://www.cs.ucsb.edu/sites/default/files/images/content/people/Faculty/hollerer.jpg",
-    },
-    {
-      id: "4",
-      name: "Taylor Swift",
-      recipes: [
-        "Vegetable Stir Fry",
-        "Chocolate Chip Cookies",
-        "Mushroom Risotto",
-      ],
-      picture:
-        "https://cdn.britannica.com/42/238242-050-C73AD528/Grammy-winner-singer-American-Taylor-Swift-2023.jpg",
-    },
-    {
-      id: "5",
-      name: "Ariana Grande",
-      recipes: ["Chicken Alfredo", "Greek Salad", "Banana Bread"],
-    },
-    {
-      id: "6",
-      name: "Minecraft Steve",
-      recipes: ["Suspicious Stew", "Milk Bucket", "Awkward Potion"],
-      picture:
-        "https://preview.redd.it/p4jpefmni5d61.png?auto=webp&s=5e6ad4dfbd3c1d6f2a0b0bc0bc64e9a30426cd07",
-    },
+    }
   ];
 
   // Current friends list - initially showing first 6 friends
@@ -282,8 +269,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const handlePickImage = async () => {
     try {
       // Check for permissions
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission required",
@@ -298,6 +284,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
+        base64: true, // Add this to get base64 data
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -305,46 +292,39 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         setIsUploading(true);
         setUploadError(null);
 
-        // In a real app, you would upload the image to a server and get a permanent URL
-        // For this example, we'll simulate an upload with a timeout
-        setTimeout(async () => {
-          try {
-            // Update the user object with the new picture URL
-            if (user) {
-              // First, store the image URI in AsyncStorage to persist it
-              await AsyncStorage.setItem("userPicture", imageUri);
-              console.log(
-                "Saved custom profile picture to AsyncStorage:",
-                imageUri
-              );
+        try {
+          // Update the user object with the new picture URL
+          if (user) {
+            // First, store the image URI in AsyncStorage
+            await AsyncStorage.setItem("userPicture", imageUri);
+            console.log("Saved profile picture to AsyncStorage:", imageUri);
 
-              // Update the user object in state
-              const updatedUser = { ...user, picture: imageUri };
+            // Update the user object in state
+            const updatedUser = { ...user, picture: imageUri };
 
+            try {
               // Send the updated profile to the backend
-              const success = await sendUpdatedProfileToBackend(updatedUser);
+              await sendUpdatedProfileToBackend(updatedUser);
 
-              if (success) {
-                // Update the local user state
-                setUser(updatedUser);
-                setProfilePicture(imageUri);
+              // Update the local user state
+              setUser(updatedUser);
+              setProfilePicture(imageUri);
 
-                setIsUploading(false);
-                setIsProfilePictureModalVisible(false);
-              } else {
-                throw new Error("Failed to update profile on server");
-              }
+              setIsUploading(false);
+              setIsProfilePictureModalVisible(false);
+            } catch (error: any) {
+              // If backend update fails, revert the AsyncStorage change
+              await AsyncStorage.removeItem("userPicture");
+              throw error;
             }
-          } catch (error) {
-            console.error("Error updating profile picture:", error);
-            setUploadError(
-              "Failed to update profile picture. Please try again."
-            );
-            setIsUploading(false);
           }
-        }, 1500);
+        } catch (error: any) {
+          console.error("Error updating profile picture:", error);
+          setUploadError(error.message || "Failed to update profile picture. Please try again.");
+          setIsUploading(false);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error picking image:", error);
       setUploadError("Error selecting image. Please try again.");
       setIsUploading(false);

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { apiRequest } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Define types for our recipe data
 interface Recipe {
@@ -22,6 +23,7 @@ interface Recipe {
 export default function Homepage() {
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tokenReady, setTokenReady] = useState(false);
   const isFocused = useIsFocused();
   // States for undo functionality
   const [removingRecipe, setRemovingRecipe] = useState<Recipe | null>(null);
@@ -32,17 +34,91 @@ export default function Homepage() {
   // State to track expanded/collapsed state of each recipe
   const [expandedRecipes, setExpandedRecipes] = useState<Record<string, boolean>>({});
 
+  // Check for token readiness
+  useEffect(() => {
+    const checkToken = async () => {
+      try {
+        // First check if we're in guest mode - if so, skip token checks entirely
+        const isGuest = await AsyncStorage.getItem("isGuest");
+        if (isGuest === "true") {
+          console.log("Guest mode detected, skipping token check entirely");
+          setLoading(false);
+          return; // Exit early, no need to check for tokens
+        }
+
+        // Not in guest mode, check for token
+        const token = await AsyncStorage.getItem("token");
+        if (token) {
+          console.log("Token found in storage, setting tokenReady to true");
+          setTokenReady(true);
+        } else {
+          console.log("No token found initially, will retry checking...");
+          // Retry checking for token every 500ms
+          let retryCount = 0;
+          const maxRetries = 20; // Try for 10 seconds max (20 * 500ms)
+
+          const tokenCheckInterval = setInterval(async () => {
+            const newToken = await AsyncStorage.getItem("token");
+            retryCount++;
+
+            if (newToken) {
+              console.log("Token found after retrying, setting tokenReady to true");
+              setTokenReady(true);
+              clearInterval(tokenCheckInterval);
+            } else if (retryCount >= maxRetries) {
+              console.log("Max retries reached, stopping token check");
+              clearInterval(tokenCheckInterval);
+              setLoading(false);
+            }
+          }, 500);
+
+          return () => clearInterval(tokenCheckInterval);
+        }
+      } catch (error) {
+        console.error("Error checking token:", error);
+        setLoading(false);
+      }
+    };
+
+    checkToken();
+  }, []);
+
   const fetchSavedRecipes = async () => {
     try {
-      const data = await apiRequest("/fridge/get_favorite_recipes");
-      setSavedRecipes(data);
+      // Check for guest mode first
+      const isGuest = await AsyncStorage.getItem("isGuest");
 
-      // Initialize all recipes as expanded
-      const initialExpandState: Record<string, boolean> = {};
-      data.forEach((recipe: Recipe) => {
-        initialExpandState[recipe.id || recipe.title] = true;
-      });
-      setExpandedRecipes(initialExpandState);
+      // Skip token check for guests but show empty state
+      if (isGuest === "true") {
+        console.log("Guest mode detected in fetchSavedRecipes, showing empty state");
+        setSavedRecipes([]);
+        setLoading(false);
+        return;
+      }
+
+      // Wait for token to be ready before making API request
+      if (!tokenReady) {
+        console.log("Waiting for authentication token to be ready...");
+        return;
+      }
+
+      const data = await apiRequest("/fridge/get_favorite_recipes");
+
+      // Check if data is an array before calling forEach
+      if (Array.isArray(data)) {
+        console.log("Successfully fetched recipes:", data.length);
+        setSavedRecipes(data);
+
+        // Initialize all recipes as expanded
+        const initialExpandState: Record<string, boolean> = {};
+        data.forEach((recipe: Recipe) => {
+          initialExpandState[recipe.id || recipe.title] = true;
+        });
+        setExpandedRecipes(initialExpandState);
+      } else {
+        console.error("Expected array of recipes but got:", data);
+        setSavedRecipes([]);
+      }
     } catch (error) {
       console.error("Error fetching saved recipes:", error);
     } finally {
@@ -59,12 +135,33 @@ export default function Homepage() {
   };
 
   useEffect(() => {
-    if (isFocused) {
-      // Each time this page is in focus, fetch the favorites.
+    const loadRecipes = async () => {
+      if (!isFocused) return;
+
       setLoading(true);
-      fetchSavedRecipes();
-    }
-  }, [isFocused]);
+
+      // Check for guest mode
+      const isGuest = await AsyncStorage.getItem("isGuest");
+
+      if (isGuest === "true") {
+        // Skip loading for guests, just show empty state
+        console.log("Guest mode detected in loadRecipes, showing empty state");
+        setLoading(false);
+        setSavedRecipes([]);
+        return;
+      }
+
+      if (tokenReady) {
+        // Only fetch if we have a token and we're not in guest mode
+        console.log("Token is ready, fetching recipes");
+        fetchSavedRecipes();
+      } else {
+        console.log("Token not ready yet, waiting...");
+      }
+    };
+
+    loadRecipes();
+  }, [isFocused, tokenReady]);
 
   // Animation for the undo popup
   useEffect(() => {
