@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: 20,
     borderRadius: 10,
-    alignItems: "flex-start",
+    alignItems: "center",
     maxHeight: "80%",
   },
   modalTitle: {
@@ -791,10 +791,13 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     alignSelf: "center",
+    marginTop: 10,
+    width: "30%",
   },
   closeButtonText: {
     color: "white",
     fontWeight: "bold",
+    textAlign: "center",
   },
   suggestedFriendCard: {
     flexDirection: "row",
@@ -870,7 +873,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 8,
     backgroundColor: "#007AFF",
-    borderRadius: 15,
+    borderRadius: 20,
   },
   changePhotoText: {
     color: "white",
@@ -884,6 +887,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
     alignItems: "center",
+    alignSelf: "center",
   },
   photoOptionText: {
     fontSize: 16,
@@ -918,6 +922,8 @@ const styles = StyleSheet.create({
   currentPhotoContainer: {
     alignItems: "center",
     marginBottom: 10,
+    width: "100%",
+    alignSelf: "center",
   },
   currentPhoto: {
     width: 100,
