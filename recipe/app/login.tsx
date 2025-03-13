@@ -40,10 +40,33 @@ interface LoginProps {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
+// Helper function to get the appropriate backend URL based on platform
+const getBackendUrl = () => {
+  if (Platform.OS === 'web') {
+    return 'http://localhost:8000';
+  } else if (Platform.OS === 'android') {
+    // Android emulator needs to use 10.0.2.2 to access host machine
+    return 'http://10.0.2.2:8000';
+  } else {
+    // iOS simulator can use localhost
+    return 'http://localhost:8000';
+  }
+};
+
 const sendUserDataToBackend = async (user: User) => {
-  console.log("Sending user idToken to backend:", user);
+  // console.log("[Login] Sending user data to backend:", {
+  //   tokenType: user.tokenType,
+  //   hasToken: !!user.token,
+  //   name: user.name,
+  //   email: user.email,
+  //   guest: user.guest
+  // });
+
   try {
-    const response = await fetch("http://localhost:8000/google-login", {
+    const backendUrl = getBackendUrl();
+    // console.log(`[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`);
+    // console.log("[Login] Making request to /google-login endpoint");
+    const response = await fetch(`${backendUrl}/google-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
@@ -51,23 +74,33 @@ const sendUserDataToBackend = async (user: User) => {
 
     if (!response.ok) {
       const errorData = await response.json();
+      console.error("[Login] Backend error response:", errorData);
       throw new Error(
         errorData.error || `Backend returned status ${response.status}`
       );
     }
 
     const result = await response.json();
-    console.log("Backend response:", result);
+    // console.log("[Login] Backend response successful:", {
+    //   hasToken: !!result.token,
+    //   tokenLength: result.token?.length
+    // });
 
-    const decoded: any = jwtDecode(result.token);
-    console.log("Decoded JWT:", decoded);
-
-    await AsyncStorage.setItem("token", result.token);
-    await AsyncStorage.setItem("userId", decoded.sub);
+    try {
+      const decoded: any = jwtDecode(result.token);
+      // console.log("[Login] Decoded JWT:", {
+      //   sub: decoded.sub,
+      //   exp: decoded.exp,
+      //   iat: decoded.iat,
+      //   expiresIn: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown'
+      // });
+    } catch (jwtError) {
+      console.error("[Login] Error decoding JWT:", jwtError);
+    }
 
     return result;
   } catch (error) {
-    console.error("Error sending user data to backend:", error);
+    console.error("[Login] Error sending user data to backend:", error);
     throw error;
   }
 };
@@ -91,28 +124,32 @@ export default function Login({ setUser }: LoginProps) {
 
   // ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
-    console.log("Pressed native sign in");
+    // console.log("Pressed native sign in");
     try {
       // Clear any previous user data
       await AsyncStorage.removeItem("hasSeenFridgeTutorial");
       await AsyncStorage.removeItem("isGuest");
+      // Clear any existing token to avoid confusion
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("userId");
 
       await GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       });
-      console.log("Attempting native (iOS/Android) Google sign in...");
+      // console.log("Attempting native (iOS/Android) Google sign in...");
 
       const info = await GoogleSignin.signIn();
-      console.log("Native sign in success, info from GoogleSignIn is:", info);
+      // console.log("Native sign in success, info from GoogleSignIn is:", info);
 
       const result = info.data;
       if (result && result.user) {
         // Save Google profile picture URL to AsyncStorage immediately
         if (result.user.photo) {
           await AsyncStorage.setItem("userPicture", result.user.photo);
-          console.log("Saved Google profile picture URL:", result.user.photo);
+          // console.log("Saved Google profile picture URL:", result.user.photo);
         }
 
+        // First set user with Google token (temporary)
         const userData: User = {
           token: result.idToken || undefined,
           tokenType: "idToken",
@@ -122,7 +159,47 @@ export default function Login({ setUser }: LoginProps) {
         };
 
         setUser(userData);
-        const backendResponse = await sendUserDataToBackend(userData);
+
+        try {
+          // Exchange Google token for JWT token
+          // console.log("[Login] Exchanging Google token for JWT token");
+          const backendResponse = await sendUserDataToBackend(userData);
+
+          // After backend authentication, update the user object with the JWT token
+          if (backendResponse && backendResponse.token) {
+            // console.log("[Login] Received JWT token from backend");
+
+            // Store JWT token in AsyncStorage
+            const decoded: any = jwtDecode(backendResponse.token);
+            await AsyncStorage.setItem("token", backendResponse.token);
+            await AsyncStorage.setItem("userId", decoded.sub);
+
+            // Verify token was stored correctly
+            const storedToken = await AsyncStorage.getItem("token");
+            // console.log("[Login] Token stored successfully:", !!storedToken);
+            if (storedToken) {
+              const tokenPreview = storedToken.substring(0, 10) + "...";
+              // console.log(`[Login] Stored token preview: ${tokenPreview}`);
+            } else {
+              console.error("[Login] Failed to store JWT token in AsyncStorage");
+            }
+
+            // Update user object with JWT token
+            const updatedUserData: User = {
+              ...userData,
+              token: backendResponse.token,
+              tokenType: "jwt" // Change token type to JWT
+            };
+            setUser(updatedUserData);
+
+            // console.log("[Login] User object updated with JWT token");
+          } else {
+            console.error("[Login] No token received from backend");
+          }
+        } catch (error) {
+          console.error("[Login] Backend authentication failed:", error);
+          // Keep the user logged in with Google token if backend fails
+        }
       } else {
         console.error("No user info returned. Full info:", info);
         Alert.alert(
@@ -152,10 +229,10 @@ export default function Login({ setUser }: LoginProps) {
     if (response?.type === "success") {
       const { authentication } = response;
       if (authentication?.accessToken) {
-        console.log(
-          "Got access token from Expo AuthSession:",
-          authentication.accessToken
-        );
+        // console.log(
+        //   "Got access token from Expo AuthSession:",
+        //   authentication.accessToken
+        // );
         handleAuthSession(authentication.accessToken);
       }
     } else if (response?.type === "error") {
@@ -172,19 +249,23 @@ export default function Login({ setUser }: LoginProps) {
       // Clear any previous user data including tutorial states
       await AsyncStorage.removeItem("hasSeenFridgeTutorial");
       await AsyncStorage.removeItem("isGuest");
+      // Clear any existing token to avoid confusion
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("userId");
 
       const res = await fetch(
         `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
       );
       const user = await res.json();
-      console.log("User info (Expo AuthSession):", user);
+      // console.log("User info (Expo AuthSession):", user);
 
       // Save Google profile picture URL to AsyncStorage immediately
       if (user.picture) {
         await AsyncStorage.setItem("userPicture", user.picture);
-        console.log("Saved Google profile picture URL (web):", user.picture);
+        // console.log("Saved Google profile picture URL (web):", user.picture);
       }
 
+      // First set user with Google token (temporary)
       const userData: User = {
         token: accessToken,
         tokenType: "accessToken",
@@ -194,7 +275,46 @@ export default function Login({ setUser }: LoginProps) {
       };
       setUser(userData);
 
-      const backendResponse = await sendUserDataToBackend(userData);
+      try {
+        // Exchange Google token for JWT token
+        // console.log("[Login] Exchanging Google token for JWT token");
+        const backendResponse = await sendUserDataToBackend(userData);
+
+        // After backend authentication, update the user object with the JWT token
+        if (backendResponse && backendResponse.token) {
+          // console.log("[Login] Received JWT token from backend");
+
+          // Store JWT token in AsyncStorage
+          const decoded: any = jwtDecode(backendResponse.token);
+          await AsyncStorage.setItem("token", backendResponse.token);
+          await AsyncStorage.setItem("userId", decoded.sub);
+
+          // Verify token was stored correctly
+          const storedToken = await AsyncStorage.getItem("token");
+          // console.log("[Login] Token stored successfully:", !!storedToken);
+          if (storedToken) {
+            const tokenPreview = storedToken.substring(0, 10) + "...";
+            // console.log(`[Login] Stored token preview: ${tokenPreview}`);
+          } else {
+            console.error("[Login] Failed to store JWT token in AsyncStorage");
+          }
+
+          // Update user object with JWT token
+          const updatedUserData: User = {
+            ...userData,
+            token: backendResponse.token,
+            tokenType: "jwt" // Change token type to JWT
+          };
+          setUser(updatedUserData);
+
+          // console.log("[Login] User object updated with JWT token");
+        } else {
+          console.error("[Login] No token received from backend");
+        }
+      } catch (error) {
+        console.error("[Login] Backend authentication failed:", error);
+        // Keep the user logged in with Google token if backend fails
+      }
     } catch (error) {
       console.error("Failed to authenticate user:", error);
     }
@@ -210,7 +330,11 @@ export default function Login({ setUser }: LoginProps) {
     await AsyncStorage.removeItem("hasSeenFridgeTutorial");
 
     // Create a temporary guest user without authentication tokens
-    const guestUser = { guest: true, name: "Guest" };
+    const guestUser: User = {
+      guest: true,
+      name: "Guest",
+      tokenType: "none" // Explicitly set token type for guests
+    };
     setUser(guestUser);
 
     // Set guest flag to ensure API requests don't use any existing tokens
