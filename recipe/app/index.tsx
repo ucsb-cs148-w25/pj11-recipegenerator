@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { apiRequest } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Define types for our recipe data
 interface Recipe {
@@ -28,23 +29,66 @@ export default function Homepage() {
   const [showUndo, setShowUndo] = useState(false);
   const undoTimeout = useRef<NodeJS.Timeout | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  // Add a ref to track if this is the first load
+  const isFirstLoad = useRef(true);
 
   // State to track expanded/collapsed state of each recipe
   const [expandedRecipes, setExpandedRecipes] = useState<Record<string, boolean>>({});
 
   const fetchSavedRecipes = async () => {
     try {
-      const data = await apiRequest("/fridge/get_favorite_recipes");
-      setSavedRecipes(data);
+      // Check if token exists before making the request
+      // console.log("[Homepage] Starting to fetch saved recipes");
+      const startTime = Date.now();
 
-      // Initialize all recipes as expanded
-      const initialExpandState: Record<string, boolean> = {};
-      data.forEach((recipe: Recipe) => {
-        initialExpandState[recipe.id || recipe.title] = true;
-      });
-      setExpandedRecipes(initialExpandState);
+      const token = await AsyncStorage.getItem("token");
+      const isGuest = await AsyncStorage.getItem("isGuest");
+      // console.log("[Homepage] Token available:", !!token);
+      // console.log("[Homepage] Is guest user:", !!isGuest);
+
+      if (token) {
+        try {
+          // Log a portion of the token for debugging (first 10 chars)
+          const tokenPreview = token.substring(0, 10) + "...";
+          // console.log(`[Homepage] Token preview: ${tokenPreview}`);
+        } catch (error) {
+          // console.log("[Homepage] Could not preview token:", error);
+        }
+      }
+
+      // console.log("[Homepage] Making API request to get favorite recipes");
+      try {
+        const data = await apiRequest("/fridge/get_favorite_recipes");
+        // console.log("[Homepage] API request successful, recipes count:", data?.length || 0);
+
+        // Check if data is an array before using it
+        if (Array.isArray(data)) {
+          setSavedRecipes(data);
+
+          // Initialize all recipes as expanded
+          const initialExpandState: Record<string, boolean> = {};
+          data.forEach((recipe: Recipe) => {
+            initialExpandState[recipe.id || recipe.title] = true;
+          });
+          setExpandedRecipes(initialExpandState);
+        } else {
+          console.warn("[Homepage] API returned non-array data:", data);
+          // Set empty recipes array if data is not an array
+          setSavedRecipes([]);
+          setExpandedRecipes({});
+        }
+      } catch (apiError) {
+        console.error("[Homepage] API request failed:", apiError);
+        // If we got a 401, check if token was cleared during the request
+        const tokenAfterRequest = await AsyncStorage.getItem("token");
+        // console.log("[Homepage] Token after failed request:", !!tokenAfterRequest);
+        throw apiError;
+      }
+
+      const endTime = Date.now();
+      // console.log(`[Homepage] Total fetch operation took ${endTime - startTime}ms`);
     } catch (error) {
-      console.error("Error fetching saved recipes:", error);
+      console.error("[Homepage] Error fetching saved recipes:", error);
     } finally {
       setLoading(false);
     }
@@ -62,7 +106,49 @@ export default function Homepage() {
     if (isFocused) {
       // Each time this page is in focus, fetch the favorites.
       setLoading(true);
-      fetchSavedRecipes();
+
+      if (isFirstLoad.current) {
+        // Add a delay on first load to ensure token is set
+        // console.log("[Homepage] First load of homepage, adding delay before fetching recipes");
+        isFirstLoad.current = false;
+
+        // Simple delay to allow login process to complete
+        setTimeout(() => {
+          // Check token type before fetching
+          AsyncStorage.getItem("token").then(token => {
+            if (token) {
+              const isGoogleToken = token.startsWith("ya29.");
+              const isJwtToken = token.startsWith("ey");
+
+              if (isGoogleToken) {
+                // console.log("[Homepage] Google token detected, waiting for JWT token...");
+                // Add a longer delay if we have a Google token
+                setTimeout(fetchSavedRecipes, 2000);
+              } else if (isJwtToken) {
+                // console.log("[Homepage] JWT token detected, proceeding with fetch");
+                fetchSavedRecipes();
+              } else {
+                // console.log("[Homepage] Unknown token type, proceeding with fetch");
+                fetchSavedRecipes();
+              }
+            } else {
+              // No token, check if guest
+              AsyncStorage.getItem("isGuest").then(isGuest => {
+                if (isGuest === "true") {
+                  // console.log("[Homepage] Guest user detected, proceeding with fetch");
+                  fetchSavedRecipes();
+                } else {
+                  // console.log("[Homepage] No token or guest status, proceeding with fetch anyway");
+                  fetchSavedRecipes();
+                }
+              });
+            }
+          });
+        }, 1000);
+      } else {
+        // On subsequent loads, fetch immediately
+        fetchSavedRecipes();
+      }
     }
   }, [isFocused]);
 

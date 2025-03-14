@@ -15,20 +15,20 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import login
+from backend.routers import login
 from pydantic import BaseModel
 import os
-
+from dotenv import load_dotenv
 
 # Import `get_current_user` from `login.py`
-from app.routers.login import get_current_user
+from backend.routers.login import get_current_user, get_user_profile
 
 
 # Import the ML functions
-from app.ML_functions import generate_delicious_recipes, extract_recipe_from_image
+from backend.ML_functions import generate_delicious_recipes, extract_recipe_from_image
 
 # Import the Pydantic models from app/models.py 
-from app.models import (
+from backend.models import (
     OpeningPageResponse,
     Item, 
     FridgeItem,
@@ -40,12 +40,23 @@ from app.models import (
     ImageRecipeResponse,
     FavoriteRecipe,
     RemoveFavoriteRequest,
-    RecipePreferences
+    RecipePreferences,
+    UserProfile,
+    UpdateProfilePictureRequest,
+    UpdateProfileResponse
 )
 
 # MongoDB URI
-# uri = "mongodb+srv://andrewzhang0708:UCSBzc20040708@cluster0.rwfaq.mongodb.net/"
-uri = "mongodb+srv://roseamberwang:IV7mdVRb5m8n6i1a@recipe.djla3.mongodb.net/?retryWrites=true&w=majority&appName=recipe"
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get MongoDB URI from environment variables
+uri = os.getenv("MONGODB_URI")
+
+# Check if the URI is available
+if not uri:
+    raise ValueError("MONGODB_URI environment variable is not set. Please check your .env file.")
 client = MongoClient(uri, server_api=ServerApi('1'))
 
 # Connect to the database and collection
@@ -59,6 +70,8 @@ class Item(BaseModel):
 # Connect to MongoDB collections
 favorite_recipes = db["favorite_recipes"]
 
+# Create a new collection for user profiles
+user_profiles = db["user_profiles"]
 
 # Connect to MongoDB collections
 favorite_recipes = db["favorite_recipes"]
@@ -75,9 +88,9 @@ app = FastAPI(
 
 app.include_router(login.router)
 
-# Secret Key
-SECRET_KEY = "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"
-ALGORITHM = "HS256"
+# Load secret key and algorithm from environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 
 app.add_middleware(
@@ -151,7 +164,7 @@ def add_item(item: Item, user_id: str = Depends(get_current_user)):
         all_items=all_items_fridge
     )
 
-@app.post("/fridge/remove", response_model=RemoveItemResponse)
+@app.delete("/fridge/remove", response_model=RemoveItemResponse)
 def remove_item(item: Item, user_id: str = Depends(get_current_user)):
     """
     Remove an item from the fridge for the current user.
@@ -182,7 +195,7 @@ def remove_item(item: Item, user_id: str = Depends(get_current_user)):
         all_items=get_items(user_id)
     )
 
-@app.post("/fridge/update_quantity", response_model=UpdateItemResponse)
+@app.put("/fridge/update_quantity", response_model=UpdateItemResponse)
 def update_quantity(item: Item, user_id: str = Depends(get_current_user)):
     """
     Update the quantity of an item in the fridge for the current user.
@@ -327,7 +340,6 @@ async def convert_image_to_recipes(image_file: UploadFile = File(...)):
     return ImageRecipeResponse(recipes=recipes_from_image)
 
 
-
 @app.get("/fridge/get_favorite_recipes")
 def get_favorite_recipes(user_id: str = Depends(get_current_user)):
     """
@@ -370,3 +382,56 @@ def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return {"message": f"Removed {recipe.title} from favorites"}
+
+# --- User Profile Endpoints --- #
+
+@app.get("/user/profile", response_model=UserProfile)
+def get_user_profile_info(profile_data = Depends(get_user_profile)):
+    """
+    Get the current user's profile information from the JWT token.
+    """
+    return UserProfile(
+        name=profile_data.get("name"),
+        email=profile_data.get("email"),
+        picture=profile_data.get("picture")
+    )
+
+@app.post("/user/update-profile-picture", response_model=UpdateProfileResponse)
+def update_profile_picture(
+    request: UpdateProfilePictureRequest, 
+    profile_data = Depends(get_user_profile)
+):
+    """
+    Update the user's profile picture URL in the database
+    """
+    user_id = profile_data["user_id"]
+    
+    try:
+        # Update or create the user profile document
+        result = user_profiles.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "picture": request.picture_url,
+                "name": profile_data.get("name"),
+                "email": profile_data.get("email")
+            }},
+            upsert=True
+        )
+        
+        # Create a UserProfile response object
+        updated_profile = UserProfile(
+            name=profile_data.get("name"),
+            email=profile_data.get("email"),
+            picture=request.picture_url
+        )
+        
+        return UpdateProfileResponse(
+            success=True,
+            message="Profile picture updated successfully",
+            profile=updated_profile
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating profile picture: {str(e)}"
+        )

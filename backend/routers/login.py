@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import httpx
 from datetime import datetime, timedelta, timezone
 import jwt
+from typing import Optional
 
 router = APIRouter()
 
@@ -15,15 +16,23 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Secret key for signing your JWT
 # Replace with a secure, random value in production (from an .env file, etc.)
-SECRET_KEY = "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"
-ALGORITHM = "HS256"
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get secret key and algorithm from environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 # The data we expect in the request body
 class GoogleLoginPayload(BaseModel):
     token: str           # Either an ID token or an Access token
     tokenType: str       # "idToken" or "accessToken"
-    name: str = None
-    email: str = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None  # Profile picture URL
 
 TEST_USERS = {
     "testuser1": {"password": "password1", "user_id": "user_id_001", "name": "User One"},
@@ -65,7 +74,8 @@ async def google_login(payload: GoogleLoginPayload):
         "token": "...",
         "tokenType": "idToken" or "accessToken",
         "name": "...",
-        "email": "..."
+        "email": "...",
+        "picture": "..." // Optional profile picture URL
       }
     Verifies the token with Google, returns {"access_token": encodedJwtToken, "token_type": "bearer"}
     """
@@ -84,20 +94,30 @@ async def google_login(payload: GoogleLoginPayload):
             content={"error": "Invalid or expired Google token: {payload.tokenType}"}
         )
 
-    # Build JWT token: user ID, email, and expiration time(24 hours)
+    # Build JWT token: user ID, email, name, picture, and expiration time (24 hours)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    
+    # Get user profile information from payload or Google response
+    user_id = userinfo.get("id") or userinfo.get("sub")
+    email = payload.email or userinfo.get("email")
+    name = payload.name or userinfo.get("name")
+    picture = payload.picture or userinfo.get("picture")
+    
     payload_data = {
-        "sub": userinfo.get("id") or userinfo.get("sub"),      # "subject": the user ID from Google
-        "email": userinfo.get("email"),
+        "sub": user_id,      # "subject": the user ID from Google
+        "email": email,
+        "name": name,
+        "picture": picture,
         "exp": expires_at
     }
+    
     # Sign the token with your SECRET_KEY
     my_jwt_token = jwt.encode(payload_data, SECRET_KEY, algorithm=ALGORITHM)
 
     # 3) Return the token to the client
     return {
         "token": my_jwt_token, 
-        "token_type":"bearer"
+        "token_type": "bearer"
     }
 
 # ============== HELPER FUNCTIONS ================== #
@@ -130,7 +150,7 @@ async def verify_google_id_token(id_token: str):
         resp = await client.get(url)
     return resp.json() if resp.status_code == 200 else None
 
-#
+
 def get_current_user(token: str = Security(oauth2_scheme)):
     """
     Extract the Google user ID (`sub`) from the JWT token.
@@ -138,5 +158,21 @@ def get_current_user(token: str = Security(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload["sub"]  # Return the Google user ID
+    except jwt.DecodeError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def get_user_profile(token: str = Security(oauth2_scheme)):
+    """
+    Extract the full user profile from the JWT token.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {
+            "user_id": payload["sub"],
+            "email": payload.get("email"),
+            "name": payload.get("name"),
+            "picture": payload.get("picture")
+        }
     except jwt.DecodeError:
         raise HTTPException(status_code=401, detail="Invalid token")

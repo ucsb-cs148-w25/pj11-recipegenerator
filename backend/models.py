@@ -103,6 +103,28 @@ class ImageRecipeResponse(BaseModel):
     ingredients: List[dict] = Field(..., description="List of ingredients with quantities detected in the image")
 
 
+class UserProfile(BaseModel):
+    """
+    Model for user profile information.
+    """
+    name: str | None = None
+    email: str | None = None
+    picture: str | None = None
+
+class UpdateProfilePictureRequest(BaseModel):
+    """
+    Model for updating a user's profile picture.
+    """
+    picture_url: str = Field(..., description="URL of the new profile picture")
+
+class UpdateProfileResponse(BaseModel):
+    """
+    Model for the response when updating profile information.
+    """
+    success: bool = Field(..., description="Whether the update was successful")
+    message: str = Field(..., description="Status message about the update")
+    profile: UserProfile = Field(..., description="Updated user profile information")
+
 # Remove or comment out the duplicate model definition that's causing conflicts
 # class ImageRecipeResponse(BaseModel):
 #     """
