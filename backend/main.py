@@ -435,3 +435,109 @@ def update_profile_picture(
             status_code=500,
             detail=f"Error updating profile picture: {str(e)}"
         )
+
+class AddFriendRequest(BaseModel):
+    email: str
+
+
+
+@app.post("/user/add_friend")
+def add_friend(
+    request: AddFriendRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Add a friend by email for the current user.
+    - 1) Find the friend user profile by email
+    - 2) Add that friend's user_id to the current user's 'friends' array
+    - 3) Return a JSON object for the newly added friend
+    """
+    # 1) Find the friend by email
+    friend_profile = user_profiles.find_one({"email": request.email})
+    if not friend_profile:
+        raise HTTPException(status_code=404, detail="Friend not found")
+
+    friend_user_id = friend_profile["user_id"]
+
+    # 2) Add the friend_user_id to the current user's 'friends' list if not already there
+    user_profiles.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"friends": friend_user_id}}  # addToSet prevents duplicates
+    )
+
+    # Optionally, you can also add the current user to the friend's 'friends' list
+    # if you want a two-way friendship by default:
+    user_profiles.update_one(
+        {"user_id": friend_user_id},
+        {"$addToSet": {"friends": user_id}}
+    )
+
+    # 3) Build a JSON response for the newly added friend
+    new_friend_data = {
+        "id": friend_user_id,
+        "name": friend_profile.get("name", ""),
+        "recipes": [],  # You could fetch favorites or leave it empty for now
+        "email": friend_profile.get("email", ""),
+        "picture": friend_profile.get("picture", "")
+    }
+
+    return new_friend_data
+
+
+@app.delete("/user/remove_friend")
+def remove_friend(friend_id: str, user_id: str = Depends(get_current_user)):
+    user_profiles.update_one({"user_id": user_id}, {"$pull": {"friends": friend_id}})
+    user_profiles.update_one({"user_id": friend_id}, {"$pull": {"friends": user_id}})
+    return {"message": "Friend removed"}
+
+
+
+@app.get("/user/friend_favorites")
+def friend_favorites(friend_id: str, user_id: str = Depends(get_current_user)):
+    """
+    Return the specified friend's favorite recipes from the database.
+    'friend_id' is the user_id of the friend whose favorites we want.
+    """
+    # Optionally, check if `friend_id` is actually a friend of the current user_id
+    # (You can skip this if you want to allow open access for now.)
+
+    # Query the 'favorite_recipes' collection for documents with user_id=friend_id
+    friend_favorites_cursor = favorite_recipes.find({"user_id": friend_id})
+
+    # Convert each doc into a simpler JSON structure
+    friend_favorites_list = [
+        {
+            "title": recipe["title"],
+            "description": recipe.get("description", "")
+        }
+        for recipe in friend_favorites_cursor
+    ]
+
+    return friend_favorites_list
+
+@app.get("/user/friends")
+def get_user_friends(user_id: str = Depends(get_current_user)):
+    """
+    Return a list of the current user's friends.
+    """
+    # Get the current user's profile
+    user_doc = user_profiles.find_one({"user_id": user_id})
+    if not user_doc:
+        return []
+    
+    friend_ids = user_doc.get("friends", [])
+    if not friend_ids:
+        return []
+
+    # Fetch friend profiles
+    friend_docs = user_profiles.find({"user_id": {"$in": friend_ids}})
+    friend_list = []
+    for doc in friend_docs:
+        friend_list.append({
+            "id": doc["user_id"],
+            "name": doc.get("name", ""),
+            "recipes": [],  # Optionally, load their favorites
+            "email": doc.get("email", ""),
+            "picture": doc.get("picture", "")
+        })
+    return friend_list
