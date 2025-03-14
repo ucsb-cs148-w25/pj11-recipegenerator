@@ -43,7 +43,7 @@ interface LoginProps {
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
   if (Platform.OS === 'web') {
-    return 'http://localhost:8000';
+    return 'http://127.0.0.1:8000';
   } else if (Platform.OS === 'android') {
     // Android emulator needs to use 10.0.2.2 to access host machine
     return 'http://10.0.2.2:8000';
@@ -54,21 +54,21 @@ const getBackendUrl = () => {
 };
 
 const sendUserDataToBackend = async (user: User) => {
-  // console.log("[Login] Sending user data to backend:", {
-  //   tokenType: user.tokenType,
-  //   hasToken: !!user.token,
-  //   name: user.name,
-  //   email: user.email,
-  //   guest: user.guest
-  // });
+  console.log("[Login] Sending user data to backend:", {
+    tokenType: user.tokenType,
+    hasToken: !!user.token,
+    name: user.name,
+    email: user.email,
+    guest: user.guest
+  });
 
   try {
     const backendUrl = getBackendUrl();
-    // console.log(`[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`);
-    // console.log("[Login] Making request to /google-login endpoint");
+    console.log(`[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`);
+    console.log("[Login] Making request to /google-login endpoint");
     const response = await fetch(`${backendUrl}/google-login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}`},
       body: JSON.stringify(user),
     });
 
@@ -81,19 +81,19 @@ const sendUserDataToBackend = async (user: User) => {
     }
 
     const result = await response.json();
-    // console.log("[Login] Backend response successful:", {
-    //   hasToken: !!result.token,
-    //   tokenLength: result.token?.length
-    // });
+    console.log("[Login] Backend response successful:", {
+      hasToken: !!result.token,
+      tokenLength: result.token?.length
+    });
 
     try {
       const decoded: any = jwtDecode(result.token);
-      // console.log("[Login] Decoded JWT:", {
-      //   sub: decoded.sub,
-      //   exp: decoded.exp,
-      //   iat: decoded.iat,
-      //   expiresIn: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown'
-      // });
+      console.log("[Login] Decoded JWT:", {
+        sub: decoded.sub,
+        exp: decoded.exp,
+        iat: decoded.iat,
+        expiresIn: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown'
+      });
     } catch (jwtError) {
       console.error("[Login] Error decoding JWT:", jwtError);
     }

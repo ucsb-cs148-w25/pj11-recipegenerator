@@ -4,13 +4,13 @@ import { Platform } from "react-native";
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
   if (Platform.OS === 'web') {
-    return 'http://localhost:8000';
+    return 'http://127.0.0.1:8000';
   } else if (Platform.OS === 'android') {
     // Android emulator needs to use 10.0.2.2 to access host machine
     return 'http://10.0.2.2:8000';
   } else {
     // iOS simulator can use localhost
-    return 'http://localhost:8000';
+    return 'http://127.0.0.1:8000';
   }
 };
 
@@ -19,7 +19,9 @@ export const apiRequest = async (endpoint: string, method = "GET", body = null):
 
   // Get token and check if user is guest
   const token = await AsyncStorage.getItem("token");
-  const isGuest = await AsyncStorage.getItem("isGuest");
+  const isGuestStr = await AsyncStorage.getItem("isGuest");
+  const isGuest = (isGuestStr === "true");
+
 
   // Check if the token is a Google token or a JWT token
   let isGoogleToken = false;
