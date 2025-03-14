@@ -41,6 +41,8 @@ export default function SettingsPage() {
           <Switch
             value={notificationsEnabled}
             onValueChange={(value) => setNotificationsEnabled(value)}
+            trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+            thumbColor={notificationsEnabled ? "#088F8F" : "#f4f3f4"}
           />
         </View>
       </View>
@@ -51,6 +53,8 @@ export default function SettingsPage() {
           <Switch
             value={friendsSuggestionEnabled}
             onValueChange={(value) => setFriendsSuggestionEnabled(value)}
+            trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+            thumbColor={friendsSuggestionEnabled ? "#088F8F" : "#f4f3f4"}
           />
         </View>
         <View style={styles.settingscategory}>
@@ -58,6 +62,8 @@ export default function SettingsPage() {
           <Switch
             value={friendsActivityEnabled}
             onValueChange={(value) => setFriendsActivityEnabled(value)}
+            trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
+            thumbColor={friendsActivityEnabled ? "#088F8F" : "#f4f3f4"}
           />
         </View>
       </View>
