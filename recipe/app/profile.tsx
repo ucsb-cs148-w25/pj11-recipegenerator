@@ -461,11 +461,13 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                 {selectedFriend?.name}'s Favorite Recipes
               </Text>
             </View>
-            {selectedFriend?.recipes.map((recipe, index) => (
-              <Text key={index} style={styles.recipeText}>
-                • {recipe}
-              </Text>
-            ))}
+            <View style={styles.recipeContainer}>
+              {selectedFriend?.recipes.map((recipe, index) => (
+                <Text key={index} style={styles.recipeText}>
+                  • {recipe}
+                </Text>
+              ))}
+            </View>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setSelectedFriend(null)}
@@ -523,18 +525,21 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
             )}
 
             {/* Email Add Friend Section */}
-            <TextInput
-              style={styles.emailInput}
-              placeholder="Enter friend's email"
-              value={emailInput}
-              onChangeText={setEmailInput}
-            />
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddFriendByEmail}
-            >
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
+            
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TextInput
+                style={[styles.emailInput, { flex: 1 }]}
+                placeholder="Enter friend's email"
+                value={emailInput}
+                onChangeText={setEmailInput}
+              />
+              <TouchableOpacity
+                style={[styles.addButton, { marginLeft: 10, marginBottom: 15 }]}
+                onPress={handleAddFriendByEmail}
+              >
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[styles.closeButton, { marginTop: 20 }]}
@@ -770,7 +775,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: 20,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: "stretch",
     maxHeight: "80%",
   },
   modalTitle: {
@@ -779,12 +784,16 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#1A535C",
     alignSelf: "center",
+    textAlign: "center",
   },
   recipeText: {
     fontSize: 16,
     marginBottom: 5,
     color: "#1A535C",
     paddingLeft: 30,
+    textAlign: "left",
+    alignSelf: "flex-start",
+    width: "100%",
   },
   closeButton: {
     backgroundColor: "#1A535C",
@@ -840,6 +849,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
+    alignSelf: "center",
   },
   addButtonText: {
     color: "white",
@@ -858,7 +868,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginBottom: 15,
-    width: "100%",
+    width: "80%",
   },
   friendEmail: {
     fontSize: 14,
@@ -912,6 +922,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
+    alignSelf: "center",
+    justifyContent: "center",
   },
   friendModalIcon: {
     width: 50,
@@ -939,5 +951,11 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  recipeContainer: {
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    alignSelf: "flex-start",
   },
 });
