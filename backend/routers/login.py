@@ -7,20 +7,28 @@ import httpx
 from datetime import datetime, timedelta, timezone
 import jwt
 from typing import Optional
-
-router = APIRouter()
-
-# OAuth2 scheme (used in main.py)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-# Secret key for signing your JWT
-# Replace with a secure, random value in production (from an .env file, etc.)
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv
 
+router = APIRouter()
+
 # Load environment variables from .env file
 load_dotenv()
+
+# Get MongoDB URI from environment variables
+uri = os.getenv("MONGODB_URI")
+if not uri:
+    raise ValueError("MONGODB_URI environment variable is not set. Please check your .env file.")
+
+# Initialize MongoDB client
+client = MongoClient(uri, server_api=ServerApi('1'))
+db = client["fridge"]
+user_profiles = db["user_profiles"]
+
+# OAuth2 scheme (used in main.py)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Get secret key and algorithm from environment variables
 SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
@@ -33,38 +41,6 @@ class GoogleLoginPayload(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     picture: Optional[str] = None  # Profile picture URL
-
-TEST_USERS = {
-    "testuser1": {"password": "password1", "user_id": "user_id_001", "name": "User One"},
-    "testuser2": {"password": "password2", "user_id": "user_id_002", "name": "User Two"},
-    "testuser3": {"password": "password3", "user_id": "user_id_003", "name": "User Three"}
-}
-
-def generate_jwt_token(user_id: str, name: str) -> str:
-    payload = {
-        "sub": user_id,
-        "name": name,
-        "exp": datetime.utcnow() + timedelta(hours = 1)
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-@router.post("/login")
-def login(request: LoginRequest):
-    """
-    Accepts username & password in JSON format.
-    """
-    user = TEST_USERS.get(request.username)
-    
-    if user and request.password == user["password"]:
-        token = generate_jwt_token(user_id=user["user_id"], name=user["name"])
-        return {"access_token": token, "token_type": "bearer"}
-    
-    raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @router.post("/google-login")
 async def google_login(payload: GoogleLoginPayload):
@@ -103,6 +79,28 @@ async def google_login(payload: GoogleLoginPayload):
     name = payload.name or userinfo.get("name")
     picture = payload.picture or userinfo.get("picture")
     
+    # Update or create user profile in MongoDB
+    try:
+        # Fetch existing user profile
+        existing_user = user_profiles.find_one({"user_id": user_id})
+        
+        # Prepare the update data, only overwrite if new data is provided
+        update_data = {
+            "name": name,
+            "email": email,
+            "picture": picture if picture else existing_user.get("picture"),
+            "last_login": datetime.now(timezone.utc)
+        }
+        
+        user_profiles.update_one(
+            {"user_id": user_id},
+            {"$set": update_data},
+            upsert=True
+        )
+    except Exception as e:
+        print(f"Error updating user profile in MongoDB: {str(e)}")
+        # Continue with token generation even if MongoDB update fails
+    
     payload_data = {
         "sub": user_id,      # "subject": the user ID from Google
         "email": email,
@@ -114,7 +112,7 @@ async def google_login(payload: GoogleLoginPayload):
     # Sign the token with your SECRET_KEY
     my_jwt_token = jwt.encode(payload_data, SECRET_KEY, algorithm=ALGORITHM)
 
-    # 3) Return the token to the client
+    # Return the token to the client
     return {
         "token": my_jwt_token, 
         "token_type": "bearer"

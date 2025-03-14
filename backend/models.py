@@ -6,7 +6,7 @@ easy to understand and maintain.
 """
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 class FavoriteRecipe(BaseModel):
     title: str
@@ -124,6 +124,30 @@ class UpdateProfileResponse(BaseModel):
     success: bool = Field(..., description="Whether the update was successful")
     message: str = Field(..., description="Status message about the update")
     profile: UserProfile = Field(..., description="Updated user profile information")
+
+class UpdateUserInfoRequest(BaseModel):
+    """
+    Model for updating a user's profile information.
+    """
+    name: Optional[str] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None
+
+class FriendInfo(BaseModel):
+    """
+    Model for friend information in responses.
+    """
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None
+
+class FriendsListResponse(BaseModel):
+    """
+    Model for the response when retrieving a user's friends list.
+    """
+    friends: List[FriendInfo]
+    count: int
 
 # Remove or comment out the duplicate model definition that's causing conflicts
 # class ImageRecipeResponse(BaseModel):
