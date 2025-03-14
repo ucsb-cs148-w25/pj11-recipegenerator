@@ -7,7 +7,7 @@ import {
   Alert,
 } from "react-native";
 import { useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiRequest } from "./api";
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -15,18 +15,108 @@ export default function SettingsPage() {
     useState(false);
   const [friendsActivityEnabled, setFriendsActivityEnabled] = useState(false);
 
+  // Debug function to check tutorial status directly
+  const debugTutorialStatus = async () => {
+    try {
+      console.log("Checking tutorial status directly...");
+      const response = await apiRequest("/user/debug-tutorial-status");
+      console.log("Debug tutorial status response:", response);
+
+      if (response && response.profile) {
+        const tutorialCompleted = response.profile.tutorial_completed;
+        console.log("Tutorial completed value:", tutorialCompleted);
+        console.log("Tutorial completed type:", response.profile.tutorial_completed_type);
+        console.log("Raw profile:", response.profile.raw_profile);
+
+        // Check if the field exists in the raw profile
+        const fieldExists = response.profile.raw_profile.includes("'tutorial_completed'");
+
+        // Determine the status message based on the value
+        let statusMessage = "Unknown";
+        if (tutorialCompleted === 1) {
+          statusMessage = "Completed (1)";
+        } else if (tutorialCompleted === 0) {
+          statusMessage = "Not Completed (0)";
+        } else if (tutorialCompleted === true) {
+          statusMessage = "Completed (true)";
+        } else if (tutorialCompleted === false) {
+          statusMessage = "Not Completed (false)";
+        } else if (tutorialCompleted === undefined) {
+          statusMessage = "Undefined (field missing)";
+        } else {
+          statusMessage = `Other value: ${tutorialCompleted}`;
+        }
+
+        Alert.alert(
+          "Tutorial Status Debug",
+          `Status: ${statusMessage}\n` +
+          `Value: ${tutorialCompleted}\n` +
+          `Type: ${response.profile.tutorial_completed_type}\n` +
+          `Field exists in DB: ${fieldExists}`
+        );
+      } else {
+        console.warn("Debug response missing profile data");
+        Alert.alert("Debug Error", "Could not retrieve tutorial status");
+      }
+    } catch (error: any) {
+      console.error("Error debugging tutorial status:", error);
+      Alert.alert("Debug Error", "Failed to check tutorial status");
+    }
+  };
+
   // Function to reset tutorial flags in AsyncStorage
   const resetTutorial = async () => {
     try {
-      await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+      console.log("Resetting tutorial status by deleting the field...");
+
+      // Use the DELETE endpoint to completely remove the tutorial_completed field
+      const response = await apiRequest("/user/delete-tutorial-status", "DELETE");
+      console.log("Delete tutorial status response:", response);
+
+      // Log more details about the response
+      if (response && response.profile) {
+        console.log("Tutorial completed status:", response.profile.tutorial_completed);
+        console.log("Full profile object:", response.profile);
+        console.log("Response message:", response.message);
+
+        // Verify the tutorial was actually reset
+        // Tutorial is reset if:
+        // - tutorial_completed is 0
+        // - tutorial_completed is false
+        // - tutorial_completed is "no"
+        // - tutorial_completed is "false"
+        // - tutorial_completed is undefined
+        const tutorialReset =
+          response.profile.tutorial_completed === 0 ||
+          response.profile.tutorial_completed === false ||
+          response.profile.tutorial_completed === "no" ||
+          response.profile.tutorial_completed === "false" ||
+          response.profile.tutorial_completed === undefined;
+
+        if (!tutorialReset) {
+          console.warn("Warning: Tutorial may not have been reset properly. Status:",
+            response.profile.tutorial_completed);
+        } else {
+          console.log("Tutorial successfully reset!");
+        }
+      } else {
+        console.warn("Warning: Response or profile object is missing");
+        console.log("Full response:", response);
+      }
 
       // Simple confirmation
       Alert.alert(
         "Tutorial Reset",
         "The tutorial has been reset. It will appear the next time you visit the Fridge page."
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error resetting tutorial:", error);
+      // Log more details about the error
+      if (error.response) {
+        console.error("Error response:", error.response.data);
+        console.error("Error status:", error.response.status);
+        console.error("Error headers:", error.response.headers);
+      }
       Alert.alert("Error", "Failed to reset tutorial. Please try again.");
     }
   };
@@ -76,6 +166,14 @@ export default function SettingsPage() {
           </Text>
           <TouchableOpacity style={styles.resetButton} onPress={resetTutorial}>
             <Text style={styles.resetButtonText}>Reset Tutorial</Text>
+          </TouchableOpacity>
+
+          {/* Debug button - only visible in development */}
+          <TouchableOpacity
+            style={[styles.resetButton, { marginTop: 10, backgroundColor: '#666' }]}
+            onPress={debugTutorialStatus}
+          >
+            <Text style={styles.resetButtonText}>Debug Tutorial Status</Text>
           </TouchableOpacity>
         </View>
       </View>

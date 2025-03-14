@@ -716,12 +716,16 @@ async def upload_profile_picture(
         # Read the image file
         image_data = await image_file.read()
         
-        # Here you would typically:
-        # 1. Upload the image to a cloud storage service (like AWS S3, Google Cloud Storage)
-        # 2. Get back a public URL for the image
-        # For now, we'll use a placeholder URL
-        # TODO: Implement actual cloud storage upload
-        image_url = f"https://storage.example.com/profiles/{user_id}/{image_file.filename}"
+        # For a real application, you would upload this to cloud storage
+        # and get back a URL. For now, we'll use a placeholder URL
+        # that includes the user ID to make it unique.
+        
+        # In a production environment, replace this with actual cloud storage upload
+        # For example, using AWS S3, Google Cloud Storage, etc.
+        
+        # For testing purposes, we'll just use a fake URL that includes the user ID
+        # This allows the frontend to work without actual cloud storage
+        image_url = f"https://example.com/profile-pictures/{user_id}/{image_file.filename}"
         
         # Update the user profile with the new image URL
         result = user_profiles.update_one(

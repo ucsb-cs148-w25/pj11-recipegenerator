@@ -12,7 +12,6 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { FontAwesome } from "@expo/vector-icons";
 import { apiRequest } from "./api";
@@ -170,14 +169,52 @@ function FridgePage() {
   // Check if user is a first-time user
   const checkFirstTimeUser = async () => {
     try {
-      const hasSeenTutorial = await AsyncStorage.getItem(
-        "hasSeenFridgeTutorial"
-      );
-      if (hasSeenTutorial !== "true") {
+      console.log("Checking tutorial status...");
+      const response = await apiRequest("/user/tutorial-status");
+      console.log("Tutorial status response:", response);
+
+      // Check if tutorial is not completed (0 = not completed, 1 = completed)
+      // Handle both integer and boolean values for backward compatibility
+      if (response) {
+        const tutorialCompleted = response.tutorial_completed;
+        console.log("Tutorial completed value:", tutorialCompleted, "Type:", typeof tutorialCompleted);
+
+        // Tutorial is not completed if:
+        // - tutorial_completed is 0
+        // - tutorial_completed is false
+        // - tutorial_completed is "no"
+        // - tutorial_completed is "false"
+        // - tutorial_completed is undefined
+        const isNotCompleted =
+          tutorialCompleted === 0 ||
+          tutorialCompleted === false ||
+          tutorialCompleted === "no" ||
+          tutorialCompleted === "false" ||
+          tutorialCompleted === undefined;
+
+        if (isNotCompleted) {
+          console.log("Starting tutorial - user hasn't completed it yet");
+          startTutorial();
+        } else {
+          console.log("Tutorial already completed - skipping");
+        }
+      } else {
+        console.log("No response from tutorial status endpoint - starting tutorial");
         startTutorial();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error checking tutorial status:", error);
+      // Log more details about the error
+      if (error.response) {
+        if (error.response.status === 404) {
+          console.error("User not found:", error.response.data);
+          startTutorial();
+        } else {
+          console.error("Error response:", error.response.data);
+          console.error("Error status:", error.response.status);
+          console.error("Error headers:", error.response.headers);
+        }
+      }
     }
   };
 
@@ -234,9 +271,17 @@ function FridgePage() {
     setCurrentTutorialStep(TutorialStep.None);
 
     try {
-      await AsyncStorage.setItem("hasSeenFridgeTutorial", "true");
-    } catch (error) {
+      console.log("Marking tutorial as complete...");
+      const response = await apiRequest("/user/complete-tutorial", "POST");
+      console.log("Complete tutorial response:", response);
+    } catch (error: any) {
       console.error("Error saving tutorial status:", error);
+      // Log more details about the error
+      if (error.response) {
+        console.error("Error response:", error.response.data);
+        console.error("Error status:", error.response.status);
+        console.error("Error headers:", error.response.headers);
+      }
     }
   };
 
@@ -246,9 +291,17 @@ function FridgePage() {
     setCurrentTutorialStep(TutorialStep.None);
 
     try {
-      await AsyncStorage.setItem("hasSeenFridgeTutorial", "true");
-    } catch (error) {
+      console.log("Skipping tutorial...");
+      const response = await apiRequest("/user/complete-tutorial", "POST");
+      console.log("Skip tutorial response:", response);
+    } catch (error: any) {
       console.error("Error saving tutorial status:", error);
+      // Log more details about the error
+      if (error.response) {
+        console.error("Error response:", error.response.data);
+        console.error("Error status:", error.response.status);
+        console.error("Error headers:", error.response.headers);
+      }
     }
   };
 
@@ -437,9 +490,9 @@ function FridgePage() {
       return;
     }
 
-    // Launch image picker for images only
+    // Launch image picker for images only  
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       quality: 1,
     });
@@ -988,7 +1041,7 @@ function FridgePage() {
         style={[
           styles.searchContainer,
           currentTutorialStep === TutorialStep.SearchFeature &&
-            styles.highlightedElement,
+          styles.highlightedElement,
         ]}
       >
         <FontAwesome
@@ -1020,7 +1073,7 @@ function FridgePage() {
             styles.batchModeButton,
             batchMode && styles.batchModeActiveButton,
             currentTutorialStep === TutorialStep.BatchSelectionFeature1 &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
           onPress={toggleBatchMode}
         >
@@ -1040,7 +1093,7 @@ function FridgePage() {
           style={[
             styles.sortDropdownButton,
             currentTutorialStep === TutorialStep.SortFeature &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
           onPress={() => setShowSortDropdown(true)}
         >
@@ -1092,7 +1145,7 @@ function FridgePage() {
                   style={[
                     styles.sortDropdownItemText,
                     sortType === option.value &&
-                      styles.sortDropdownItemTextActive,
+                    styles.sortDropdownItemTextActive,
                   ]}
                 >
                   {option.label}
@@ -1118,7 +1171,7 @@ function FridgePage() {
             style={[
               styles.cameraButton,
               currentTutorialStep === TutorialStep.ImageUpload &&
-                styles.highlightedElement,
+              styles.highlightedElement,
             ]}
             onPress={handleCameraButtonPress}
             disabled={isImageUploading}
@@ -1134,7 +1187,7 @@ function FridgePage() {
             style={[
               styles.inputContainer,
               currentTutorialStep === TutorialStep.AddItem &&
-                styles.highlightedElement,
+              styles.highlightedElement,
             ]}
           >
             <TextInput
@@ -1158,7 +1211,7 @@ function FridgePage() {
             style={[
               styles.floatingAddButton,
               currentTutorialStep === TutorialStep.AddItem &&
-                styles.highlightedElement,
+              styles.highlightedElement,
             ]}
             onPress={addItem}
           >
@@ -1173,7 +1226,7 @@ function FridgePage() {
           style={[
             styles.floatingBatchActionBar,
             currentTutorialStep === TutorialStep.BatchSelectionFeature2 &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
         >
           <Text style={styles.floatingBatchSelectionCount}>
@@ -1203,7 +1256,7 @@ function FridgePage() {
                 Object.keys(deletedItems).indexOf(itemName) * 10, // Adjust position based on batch mode
             },
             currentTutorialStep === TutorialStep.UndoDelete &&
-              styles.highlightedElement,
+            styles.highlightedElement,
           ]}
         >
           <Text style={styles.undoText}>"{itemName}" removed</Text>

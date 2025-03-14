@@ -110,6 +110,7 @@ class UserProfile(BaseModel):
     name: str | None = None
     email: str | None = None
     picture: str | None = None
+    tutorial_completed: int | None = None  # Using int (1 or 0) instead of bool
 
 class UpdateProfilePictureRequest(BaseModel):
     """

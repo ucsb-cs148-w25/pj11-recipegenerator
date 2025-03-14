@@ -35,7 +35,7 @@ interface Friend {
 }
 
 // This would be an actual API call in a real app
-const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
+const sendUpdatedProfileToBackend = async (user: User, imageFile?: any): Promise<boolean> => {
   console.log("Sending updated profile to backend:", user);
 
   try {
@@ -48,32 +48,85 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
     // Use the correct backend URL based on the environment
     const backendUrl = Platform.OS === 'web'
       ? 'http://localhost:8000'
-      : 'http://10.0.2.2:8000'; // Use 10.0.2.2 for Android emulator, or your machine's IP for real devices
+      : 'http://10.0.2.2:8000';
 
-    // Send the profile picture URL to our backend API
-    const response = await fetch(
-      `${backendUrl}/user/update-profile-picture`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({
-          picture_url: user.picture || "",
-        }),
+    let apiResponse;
+    if (imageFile) {
+      // If we have an image file, use the upload endpoint
+      const formData = new FormData();
+
+      // Handle the image file differently based on platform
+      if (Platform.OS === 'web') {
+        try {
+          // For web, we need to fetch the image and create a blob
+          const imageResponse = await fetch(imageFile);
+          const blob = await imageResponse.blob();
+
+          // Ensure a valid filename with an allowed extension
+          let filename = 'profile-picture.jpg';
+          formData.append('image_file', blob, filename);
+        } catch (error) {
+          console.error("Error creating blob from image:", error);
+          throw new Error("Failed to process image for upload");
+        }
+      } else {
+        // For native platforms, we can use the URI directly
+        const filename = imageFile.split('/').pop() || 'profile-picture.jpg';
+        // Ensure the filename has a valid extension
+        const validFilename = /\.(jpg|jpeg|png|gif|bmp|webp|tiff)$/i.test(filename)
+          ? filename
+          : `${filename}.jpg`;
+
+        const match = /\.(\w+)$/.exec(validFilename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        formData.append('image_file', {
+          uri: imageFile,
+          name: validFilename,
+          type,
+        } as any);
       }
-    );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Backend error:", errorData);
-      throw new Error(
-        errorData.detail || `Failed to update profile picture: ${response.status} ${response.statusText}`
+      console.log("Uploading image with FormData");
+
+      // Important: Do NOT set Content-Type header for multipart/form-data
+      // The browser/fetch will set it automatically with the correct boundary
+      apiResponse = await fetch(
+        `${backendUrl}/user/upload-profile-picture`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: formData,
+        }
+      );
+    } else {
+      // If we just have a URL (e.g., from Google), use the update endpoint
+      apiResponse = await fetch(
+        `${backendUrl}/user/update-profile-picture`,
+        {
+          method: "PUT", // Changed from POST to PUT to match backend endpoint
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({
+            picture_url: user.picture || "",
+          }),
+        }
       );
     }
 
-    const result = await response.json();
+    if (!apiResponse.ok) {
+      const errorData = await apiResponse.json();
+      console.error("Backend error:", errorData);
+      throw new Error(
+        errorData.detail || `Failed to update profile picture: ${apiResponse.status} ${apiResponse.statusText}`
+      );
+    }
+
+    const result = await apiResponse.json();
     console.log("Profile update response:", result);
 
     // Update AsyncStorage with the new picture URL from the backend response
@@ -85,7 +138,7 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
     return result.success;
   } catch (error) {
     console.error("Error sending profile update to backend:", error);
-    throw error; // Re-throw to handle in the calling function
+    throw error;
   }
 };
 
@@ -101,29 +154,36 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [profilePicture, setProfilePicture] = useState<string | undefined>(
     user?.picture
   );
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isConfirmEnabled, setIsConfirmEnabled] = useState(false);
 
   // Check for stored profile picture if not in user object
   useEffect(() => {
-    if (!user?.picture) {
-      AsyncStorage.getItem("userPicture")
-        .then((storedPicture) => {
-          if (storedPicture) {
-            console.log("Found stored profile picture:", storedPicture);
-            setProfilePicture(storedPicture);
+    const loadProfilePicture = async () => {
+      try {
+        // First try to get the picture from AsyncStorage
+        const storedPicture = await AsyncStorage.getItem("userPicture");
 
-            // Also update the user object if possible
-            if (user) {
-              const updatedUser = { ...user, picture: storedPicture };
-              setUser(updatedUser);
-            }
+        if (storedPicture) {
+          // console.log("Found stored profile picture:", storedPicture);
+          setProfilePicture(storedPicture);
+
+          // Update the user object if possible
+          if (user) {
+            const updatedUser = { ...user, picture: storedPicture };
+            setUser(updatedUser);
           }
-        })
-        .catch((error) => {
-          console.error("Error loading profile picture from storage:", error);
-        });
-    } else {
-      setProfilePicture(user.picture);
-    }
+        } else if (user?.picture) {
+          // If no stored picture but user has a picture, store it
+          await AsyncStorage.setItem("userPicture", user.picture);
+          setProfilePicture(user.picture);
+        }
+      } catch (error) {
+        console.error("Error loading profile picture:", error);
+      }
+    };
+
+    loadProfilePicture();
   }, [user?.picture]);
 
   // Update profile picture when user changes
@@ -239,30 +299,56 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   };
 
   const handleUseGooglePhoto = async () => {
-    // If user already has a Google profile photo, keep using it
-    if (user && user.picture) {
-      try {
-        setIsUploading(true);
+    try {
+      setIsUploading(true);
+      setUploadError(null);
 
-        // Store the Google profile picture in AsyncStorage
-        await AsyncStorage.setItem("userPicture", user.picture);
-        console.log("Using Google profile photo:", user.picture);
+      // Get the Google profile photo
+      let googlePhotoUrl = null;
 
-        // Send confirmation to the backend if needed
-        await sendUpdatedProfileToBackend(user);
-
-        setProfilePicture(user.picture);
-        setIsUploading(false);
-        setIsProfilePictureModalVisible(false);
-      } catch (error) {
-        console.error("Error setting Google profile picture:", error);
-        setUploadError(
-          "Failed to set Google profile picture. Please try again."
-        );
-        setIsUploading(false);
+      // First check if we have a Google photo in the user object
+      if (user?.picture && user.picture.includes('googleusercontent.com')) {
+        googlePhotoUrl = user.picture;
+      } else {
+        // Try to get the current Google user info
+        try {
+          // Check if user is signed in with Google
+          const currentUser = await GoogleSignin.getCurrentUser();
+          if (currentUser && currentUser.user && currentUser.user.photo) {
+            googlePhotoUrl = currentUser.user.photo;
+          }
+        } catch (googleError) {
+          console.error("Error getting Google user info:", googleError);
+        }
       }
-    } else {
+
+      if (!googlePhotoUrl) {
+        setUploadError("No Google profile picture available");
+        setIsUploading(false);
+        return;
+      }
+
+      // Store the Google profile picture in AsyncStorage
+      await AsyncStorage.setItem("userPicture", googlePhotoUrl);
+      console.log("Using Google profile photo:", googlePhotoUrl);
+
+      // Update the user object
+      const updatedUser = { ...user!, picture: googlePhotoUrl };
+
+      // Send confirmation to the backend
+      await sendUpdatedProfileToBackend(updatedUser);
+
+      // Update the UI
+      setUser(updatedUser);
+      setProfilePicture(googlePhotoUrl);
+      setIsUploading(false);
       setIsProfilePictureModalVisible(false);
+    } catch (error) {
+      console.error("Error setting Google profile picture:", error);
+      setUploadError(
+        "Failed to set Google profile picture. Please try again."
+      );
+      setIsUploading(false);
     }
   };
 
@@ -280,53 +366,46 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
-        base64: true, // Add this to get base64 data
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
-        setIsUploading(true);
+        setSelectedImage(imageUri);
+        setIsConfirmEnabled(true);
         setUploadError(null);
-
-        try {
-          // Update the user object with the new picture URL
-          if (user) {
-            // First, store the image URI in AsyncStorage
-            await AsyncStorage.setItem("userPicture", imageUri);
-            console.log("Saved profile picture to AsyncStorage:", imageUri);
-
-            // Update the user object in state
-            const updatedUser = { ...user, picture: imageUri };
-
-            try {
-              // Send the updated profile to the backend
-              await sendUpdatedProfileToBackend(updatedUser);
-
-              // Update the local user state
-              setUser(updatedUser);
-              setProfilePicture(imageUri);
-
-              setIsUploading(false);
-              setIsProfilePictureModalVisible(false);
-            } catch (error: any) {
-              // If backend update fails, revert the AsyncStorage change
-              await AsyncStorage.removeItem("userPicture");
-              throw error;
-            }
-          }
-        } catch (error: any) {
-          console.error("Error updating profile picture:", error);
-          setUploadError(error.message || "Failed to update profile picture. Please try again.");
-          setIsUploading(false);
-        }
       }
     } catch (error: any) {
       console.error("Error picking image:", error);
       setUploadError("Error selecting image. Please try again.");
+    }
+  };
+
+  const handleConfirmImage = async () => {
+    if (!selectedImage || !user) return;
+
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      // Send the image file to the backend
+      await sendUpdatedProfileToBackend(user, selectedImage);
+
+      // Update the local user state
+      const updatedUser = { ...user, picture: selectedImage };
+      setUser(updatedUser);
+      setProfilePicture(selectedImage);
+      setSelectedImage(null);
+      setIsConfirmEnabled(false);
+
+      setIsUploading(false);
+      setIsProfilePictureModalVisible(false);
+    } catch (error: any) {
+      console.error("Error updating profile picture:", error);
+      setUploadError(error.message || "Failed to update profile picture. Please try again.");
       setIsUploading(false);
     }
   };
@@ -525,7 +604,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
             )}
 
             {/* Email Add Friend Section */}
-            
+
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TextInput
                 style={[styles.emailInput, { flex: 1 }]}
@@ -570,30 +649,49 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
               </View>
             ) : (
               <>
-                {profilePicture && !user?.guest && (
+                {selectedImage && (
+                  <View style={styles.currentPhotoContainer}>
+                    <Image
+                      source={{ uri: selectedImage }}
+                      style={styles.currentPhoto}
+                      onError={() => {
+                        console.log("Error loading selected image");
+                        setUploadError("Could not load selected image");
+                      }}
+                    />
+                    <Text style={styles.currentPhotoText}>Selected Photo</Text>
+                  </View>
+                )}
+
+                {profilePicture && !user?.guest && !selectedImage && (
                   <View style={styles.currentPhotoContainer}>
                     <Image
                       source={{ uri: profilePicture }}
                       style={styles.currentPhoto}
                       onError={() => {
                         console.log("Error loading profile picture");
-                        setUploadError(
-                          "Could not load current profile picture"
-                        );
+                        setUploadError("Could not load current profile picture");
                       }}
                     />
                     <Text style={styles.currentPhotoText}>Current Photo</Text>
                   </View>
                 )}
 
-                {profilePicture && !user?.guest && (
+                {profilePicture && !user?.guest && !selectedImage && (
                   <TouchableOpacity
                     style={styles.photoOption}
+                    onPress={() => setIsProfilePictureModalVisible(false)}
+                  >
+                    <Text style={styles.photoOptionText}>Keep Current Photo</Text>
+                  </TouchableOpacity>
+                )}
+
+                {!user?.guest && (
+                  <TouchableOpacity
+                    style={[styles.photoOption, { backgroundColor: '#4285F4' }]}
                     onPress={handleUseGooglePhoto}
                   >
-                    <Text style={styles.photoOptionText}>
-                      Keep Current Photo
-                    </Text>
+                    <Text style={[styles.photoOptionText, { color: 'white' }]}>Use Google Photo</Text>
                   </TouchableOpacity>
                 )}
 
@@ -601,9 +699,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                   style={styles.photoOption}
                   onPress={handlePickImage}
                 >
-                  <Text style={styles.photoOptionText}>
-                    Choose from Library
-                  </Text>
+                  <Text style={styles.photoOptionText}>Choose from Library</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -612,21 +708,31 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                 >
                   <Text style={styles.photoOptionText}>Use Default Photo</Text>
                 </TouchableOpacity>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => {
+                      setIsProfilePictureModalVisible(false);
+                      setUploadError(null);
+                      setSelectedImage(null);
+                      setIsConfirmEnabled(false);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  {isConfirmEnabled && (
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.confirmButton]}
+                      onPress={handleConfirmImage}
+                    >
+                      <Text style={styles.modalButtonText}>Confirm</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </>
             )}
-
-            <TouchableOpacity
-              style={[styles.closeButton, isUploading && styles.disabledButton]}
-              disabled={isUploading}
-              onPress={() => {
-                if (!isUploading) {
-                  setIsProfilePictureModalVisible(false);
-                  setUploadError(null);
-                }
-              }}
-            >
-              <Text style={styles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -957,5 +1063,29 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "flex-start",
     alignSelf: "flex-start",
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 10,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
