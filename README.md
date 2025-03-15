@@ -113,6 +113,8 @@ Create a `.env` file in the root directory with the following variables:
 MONGODB_URI=your_mongodb_connection_string
 OPENAI_API_KEY=your_openai_api_key
 GROQ_API_KEY=your_groq_api_key
+SECRET_KEY = your_secret_key   # for jwt, default is "default-secret-key"
+ALGORITHM = your_algorithm     # for jwt, default is HS256
 ```
 
 #### D. Run the Backend Server
@@ -121,7 +123,11 @@ GROQ_API_KEY=your_groq_api_key
 uvicorn main:app --reload
 ```
 
-The backend API will be available at `http://localhost:8000`. 
+- The backend API will be available at `http://localhost:8000`.
+- Alternative API docs Documentation at `http://127.0.0.1:8000/docs`
+- If you are curious about how the raw OpenAPI schema looks like, FastAPI automatically generates a JSON (schema) with the descriptions of all your API. You can see it directly at: `http://127.0.0.1:8000/openapi.json`.
+- The backend will automatically reload on code changes.
+
 
 ## Troubleshooting
 
