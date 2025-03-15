@@ -33,7 +33,9 @@ export default function Homepage() {
   const isFirstLoad = useRef(true);
 
   // State to track expanded/collapsed state of each recipe
-  const [expandedRecipes, setExpandedRecipes] = useState<Record<string, boolean>>({});
+  const [expandedRecipes, setExpandedRecipes] = useState<
+    Record<string, boolean>
+  >({});
 
   const fetchSavedRecipes = async () => {
     try {
@@ -96,9 +98,9 @@ export default function Homepage() {
 
   // Toggle recipe expansion
   const toggleRecipeExpansion = (recipeId: string) => {
-    setExpandedRecipes(prev => ({
+    setExpandedRecipes((prev) => ({
       ...prev,
-      [recipeId]: !prev[recipeId]
+      [recipeId]: !prev[recipeId],
     }));
   };
 
@@ -115,7 +117,7 @@ export default function Homepage() {
         // Simple delay to allow login process to complete
         setTimeout(() => {
           // Check token type before fetching
-          AsyncStorage.getItem("token").then(token => {
+          AsyncStorage.getItem("token").then((token) => {
             if (token) {
               const isGoogleToken = token.startsWith("ya29.");
               const isJwtToken = token.startsWith("ey");
@@ -133,7 +135,7 @@ export default function Homepage() {
               }
             } else {
               // No token, check if guest
-              AsyncStorage.getItem("isGuest").then(isGuest => {
+              AsyncStorage.getItem("isGuest").then((isGuest) => {
                 if (isGuest === "true") {
                   // console.log("[Homepage] Guest user detected, proceeding with fetch");
                   fetchSavedRecipes();
@@ -214,9 +216,9 @@ export default function Homepage() {
       setSavedRecipes((prevRecipes) => [removingRecipe, ...prevRecipes]);
 
       // Make sure the expanded state is set
-      setExpandedRecipes(prev => ({
+      setExpandedRecipes((prev) => ({
         ...prev,
-        [removingRecipe.id || removingRecipe.title]: true
+        [removingRecipe.id || removingRecipe.title]: true,
       }));
     }
 
@@ -226,7 +228,9 @@ export default function Homepage() {
 
   const finalizeRemoveFavorite = async (title: string) => {
     try {
-      await apiRequest("/fridge/remove_favorite_recipe", "POST", { title } as any);
+      await apiRequest("/fridge/remove_favorite_recipe", "POST", {
+        title,
+      } as any);
       console.log("Recipe removed from favorites:", title);
     } catch (error) {
       console.error("Error removing favorite recipe:", error);
@@ -269,7 +273,6 @@ export default function Homepage() {
                     <Text style={styles.recipeName}>{recipe.title}</Text>
                   </TouchableOpacity>
                   <View style={styles.headerButtons}>
-
                     <TouchableOpacity
                       onPress={() => toggleRecipeExpansion(recipeId)}
                       style={styles.toggleButton}
@@ -348,8 +351,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   container: {
     flex: 1,

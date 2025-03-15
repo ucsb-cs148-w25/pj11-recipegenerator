@@ -42,14 +42,14 @@ interface LoginProps {
 
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
-  if (Platform.OS === 'web') {
-    return 'http://127.0.0.1:8000';
-  } else if (Platform.OS === 'android') {
+  if (Platform.OS === "web") {
+    return "http://127.0.0.1:8000";
+  } else if (Platform.OS === "android") {
     // Android emulator needs to use 10.0.2.2 to access host machine
-    return 'http://10.0.2.2:8000';
+    return "http://10.0.2.2:8000";
   } else {
     // iOS simulator can use localhost
-    return 'http://localhost:8000';
+    return "http://localhost:8000";
   }
 };
 
@@ -59,16 +59,21 @@ const sendUserDataToBackend = async (user: User) => {
     hasToken: !!user.token,
     name: user.name,
     email: user.email,
-    guest: user.guest
+    guest: user.guest,
   });
 
   try {
     const backendUrl = getBackendUrl();
-    console.log(`[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`);
+    console.log(
+      `[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`
+    );
     console.log("[Login] Making request to /google-login endpoint");
     const response = await fetch(`${backendUrl}/google-login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}`},
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user?.token}`,
+      },
       body: JSON.stringify(user),
     });
 
@@ -83,7 +88,7 @@ const sendUserDataToBackend = async (user: User) => {
     const result = await response.json();
     console.log("[Login] Backend response successful:", {
       hasToken: !!result.token,
-      tokenLength: result.token?.length
+      tokenLength: result.token?.length,
     });
 
     try {
@@ -92,7 +97,9 @@ const sendUserDataToBackend = async (user: User) => {
         sub: decoded.sub,
         exp: decoded.exp,
         iat: decoded.iat,
-        expiresIn: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown'
+        expiresIn: decoded.exp
+          ? new Date(decoded.exp * 1000).toISOString()
+          : "unknown",
       });
     } catch (jwtError) {
       console.error("[Login] Error decoding JWT:", jwtError);
@@ -181,14 +188,16 @@ export default function Login({ setUser }: LoginProps) {
               const tokenPreview = storedToken.substring(0, 10) + "...";
               // console.log(`[Login] Stored token preview: ${tokenPreview}`);
             } else {
-              console.error("[Login] Failed to store JWT token in AsyncStorage");
+              console.error(
+                "[Login] Failed to store JWT token in AsyncStorage"
+              );
             }
 
             // Update user object with JWT token
             const updatedUserData: User = {
               ...userData,
               token: backendResponse.token,
-              tokenType: "jwt" // Change token type to JWT
+              tokenType: "jwt", // Change token type to JWT
             };
             setUser(updatedUserData);
 
@@ -303,7 +312,7 @@ export default function Login({ setUser }: LoginProps) {
           const updatedUserData: User = {
             ...userData,
             token: backendResponse.token,
-            tokenType: "jwt" // Change token type to JWT
+            tokenType: "jwt", // Change token type to JWT
           };
           setUser(updatedUserData);
 
@@ -333,7 +342,7 @@ export default function Login({ setUser }: LoginProps) {
     const guestUser: User = {
       guest: true,
       name: "Guest",
-      tokenType: "none" // Explicitly set token type for guests
+      tokenType: "none", // Explicitly set token type for guests
     };
     setUser(guestUser);
 
