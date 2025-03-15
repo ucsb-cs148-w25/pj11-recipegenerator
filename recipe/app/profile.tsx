@@ -18,6 +18,8 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { apiRequest } from "./api"; // our helper for API calls
+import { useNavigation } from "@react-navigation/native";
+import { EventRegister } from "react-native-event-listeners";
 
 interface ProfilePageProps {
   setUser: Dispatch<SetStateAction<User | null>>;
@@ -27,7 +29,7 @@ interface ProfilePageProps {
 interface Friend {
   id: string;
   name: string;
-  recipes: string[];
+  recipes: (string | { title: string; description?: string })[];
   email?: string;
   picture?: string;
 }
@@ -86,6 +88,43 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const [profilePicture, setProfilePicture] = useState<string | undefined>(
     user?.picture
   );
+  const [friendsSuggestionEnabled, setFriendsSuggestionEnabled] =
+    useState<boolean>(true);
+
+  // Load settings from AsyncStorage
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const friendsSuggestionValue = await AsyncStorage.getItem(
+          "friendsSuggestionEnabled"
+        );
+        // Default to true if not explicitly set to false
+        setFriendsSuggestionEnabled(friendsSuggestionValue !== "false");
+      } catch (error) {
+        console.error("Error loading friend suggestion settings:", error);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  // Listen for settings changes
+  useEffect(() => {
+    // Create a listener for settings changes
+    const listener = EventRegister.addEventListener(
+      "settingsChanged",
+      (data: any) => {
+        if (data.key === "friendsSuggestionEnabled") {
+          setFriendsSuggestionEnabled(data.value);
+        }
+      }
+    );
+
+    // Clean up the listener when the component unmounts
+    return () => {
+      EventRegister.removeEventListener(listener as string);
+    };
+  }, []);
 
   // Load stored profile picture if needed
   useEffect(() => {
@@ -141,33 +180,58 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   // For now, use static placeholders for suggested friends (you can later fetch these dynamically)
   const allPossibleFriends: Friend[] = [
     {
-      id: "1",
-      name: "Chappell Roan",
+      id: "official1",
+      name: "Recipe Copilot",
+      email: "recipecopilot@recipeai.live",
+      picture: "https://img.icons8.com/color/96/000000/chef-hat.png",
       recipes: [
-        "Spaghetti Carbonara",
-        "Avocado Toast",
-        "Blueberry Pancakes",
-        "Iced Latte",
+        "Weekly Special: Autumn Squash Soup",
+        "Trending: Spicy Chicken Tacos",
+        "Staff Pick: Chocolate Lava Cake",
+        "Popular: Garlic Butter Shrimp Pasta",
+        "New: Vegan Buddha Bowl",
       ],
     },
     {
-      id: "2",
-      name: "Ziad Matni",
-      recipes: ["Chicken Curry", "Beef Tacos"],
+      id: "daily1",
+      name: "Daily Recommendation",
+      email: "dailyrecommendation@recipeai.live",
+      picture: "https://img.icons8.com/color/96/000000/calendar.png",
+      recipes: [
+        "Monday Meal Prep: Quinoa Bowls",
+        "Quick Lunch: Mediterranean Wrap",
+        "Dinner Party: Roasted Salmon",
+        "Weekend Brunch: Avocado Toast",
+        "Healthy Snack: Greek Yogurt Parfait",
+      ],
     },
     {
-      id: "3",
+      id: "theboss1",
       name: "Tobias Hollerer",
-      recipes: ["Margherita Pizza", "Pumpkin Soup", "Grilled Salmon"],
+      email: "hollerer@cs.ucsb.edu",
+      recipes: [
+        "Margherita Pizza",
+        "Pumpkin Soup",
+        "Grilled Salmon",
+        "German Pretzel",
+        "Apple Strudel",
+      ],
     },
   ];
+
   useEffect(() => {
-    const newSuggestedFriends = allPossibleFriends.filter(
-      (possibleFriend) =>
-        !friends.some((friend) => friend.id === possibleFriend.id)
-    );
-    setSuggestedFriends(newSuggestedFriends);
-  }, [friends]);
+    // Only set suggested friends if the feature is enabled
+    if (friendsSuggestionEnabled) {
+      const newSuggestedFriends = allPossibleFriends.filter(
+        (possibleFriend) =>
+          !friends.some((friend) => friend.id === possibleFriend.id)
+      );
+      setSuggestedFriends(newSuggestedFriends);
+    } else {
+      // Clear suggested friends if the feature is disabled
+      setSuggestedFriends([]);
+    }
+  }, [friends, friendsSuggestionEnabled]);
 
   const backendUrl =
     Platform.OS === "web" ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
@@ -223,6 +287,18 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   // Fetch friend's favorite recipes when a friend is selected
   const handleSelectFriend = async (friend: Friend) => {
     try {
+      // Special handling for default suggested friends
+      if (
+        friend.id.startsWith("official") ||
+        friend.id.startsWith("daily") ||
+        friend.id.startsWith("theboss")
+      ) {
+        // For default friends, we already have their recipes in the friend object
+        setSelectedFriend(friend);
+        return;
+      }
+
+      // For regular friends, fetch recipes from the backend
       const response = await fetch(
         `${backendUrl}/user/friend_favorites?friend_id=${friend.id}`,
         {
@@ -243,10 +319,34 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
   // For suggested friends modal (keeping placeholders)
   const handleAddFriend = (friendToAdd: Friend) => {
+    // For default friends, we don't need to make an API call
+    if (
+      friendToAdd.id.startsWith("official") ||
+      friendToAdd.id.startsWith("daily") ||
+      friendToAdd.id.startsWith("theboss")
+    ) {
+      // Just add them directly to the friends list
+      setFriends([...friends, friendToAdd]);
+
+      // Close the modal if this was the last suggested friend
+      if (suggestedFriends.length <= 1) {
+        setSuggestedFriendsModalVisible(false);
+      }
+      return;
+    }
+
+    // For regular friends, we would typically make an API call here
+    // But for now, just add them to the list
     setFriends([...friends, friendToAdd]);
-    if (suggestedFriends.length === 1) {
+    if (suggestedFriends.length <= 1) {
       setSuggestedFriendsModalVisible(false);
     }
+  };
+
+  // Open the add friend modal
+  const handleOpenSuggestedFriendsModal = () => {
+    // Always open the modal, but control what's shown inside based on settings
+    setSuggestedFriendsModalVisible(true);
   };
 
   // --- Sign Out & Profile Picture Functions (unchanged) ---
@@ -416,7 +516,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       </View>
       <View style={styles.header}>
         <Text style={styles.sectionTitle}>Friends</Text>
-        <TouchableOpacity onPress={() => setSuggestedFriendsModalVisible(true)}>
+        <TouchableOpacity onPress={handleOpenSuggestedFriendsModal}>
           <Image source={require("../assets/images/addfriend.png")} />
         </TouchableOpacity>
       </View>
@@ -477,16 +577,17 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                 {selectedFriend?.name}'s Favorite Recipes
               </Text>
             </View>
-            {selectedFriend?.recipes.map((recipe, index) => (
-              <View key={index} style={styles.recipeContainer}>
-                <Text style={styles.recipeText}>• {recipe.title}</Text>
-                {recipe.description && (
-                  <Text style={styles.recipeDescription}>
-                    {recipe.description}
-                  </Text>
-                )}
-              </View>
-            ))}
+            <ScrollView style={styles.recipesScrollView}>
+              {selectedFriend?.recipes.map((recipe, index) => (
+                <View key={index} style={styles.recipeContainer}>
+                  {typeof recipe === "string" ? (
+                    <Text style={styles.recipeText}>• {recipe}</Text>
+                  ) : (
+                    <Text style={styles.recipeText}>• {recipe.title}</Text>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
 
             <TouchableOpacity
               style={styles.closeButton}
@@ -505,55 +606,89 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Suggested Friends</Text>
-            {suggestedFriends.length > 0 ? (
-              suggestedFriends.map((suggestedFriend) => (
-                <View
-                  key={suggestedFriend.id}
-                  style={styles.suggestedFriendCard}
-                >
-                  <Image
-                    source={
-                      suggestedFriend.picture
-                        ? { uri: suggestedFriend.picture }
-                        : require("../assets/images/defaultprofilepic.png")
-                    }
-                    style={styles.suggestedFriendIcon}
-                  />
-                  <View style={styles.suggestedFriendInfo}>
-                    <Text style={styles.suggestedFriendName}>
-                      {suggestedFriend.name}
-                    </Text>
-                    <Text style={styles.suggestedFriendRecipeCount}>
-                      {suggestedFriend.recipes.length} favorite recipes
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => handleAddFriend(suggestedFriend)}
+            <Text style={styles.modalTitle}>
+              {friendsSuggestionEnabled ? "Suggested Friends" : "Add Friend"}
+            </Text>
+
+            {/* Only show suggested friends if the feature is enabled */}
+            {friendsSuggestionEnabled && suggestedFriends.length > 0 && (
+              <>
+                {suggestedFriends.map((suggestedFriend) => (
+                  <View
+                    key={suggestedFriend.id}
+                    style={styles.suggestedFriendCard}
                   >
-                    <Text style={styles.addButtonText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-              ))
-            ) : (
+                    <Image
+                      source={
+                        suggestedFriend.picture
+                          ? { uri: suggestedFriend.picture }
+                          : require("../assets/images/defaultprofilepic.png")
+                      }
+                      style={styles.suggestedFriendIcon}
+                    />
+                    <View style={styles.suggestedFriendInfo}>
+                      <Text style={styles.suggestedFriendName}>
+                        {suggestedFriend.name}
+                      </Text>
+                      <Text style={styles.suggestedFriendRecipeCount}>
+                        {suggestedFriend.recipes.length} favorite recipes
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={() => handleAddFriend(suggestedFriend)}
+                    >
+                      <Text style={styles.addButtonText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {/* Show message if suggestions are enabled but none are available */}
+            {friendsSuggestionEnabled && suggestedFriends.length === 0 && (
               <Text style={styles.noFriendsText}>
                 No more suggested friends available
               </Text>
             )}
-            {/* Email Add Friend Section */}
-            <TextInput
-              style={styles.emailInput}
-              placeholder="Enter friend's email"
-              value={emailInput}
-              onChangeText={setEmailInput}
-            />
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddFriendByEmail}
-            >
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
+
+            {/* Show message if suggestions are disabled */}
+            {!friendsSuggestionEnabled && (
+              <View style={styles.settingMessageContainer}>
+                <Text style={styles.settingMessage}>
+                  Friend suggestions are currently disabled.
+                </Text>
+                {/* <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => {
+                    setSuggestedFriendsModalVisible(false);
+                    // Navigate to settings
+                    const navigation = useNavigation();
+                    navigation.navigate("Settings" as never);
+                  }}
+                >
+                  <Text style={styles.settingsButtonText}>Go to Settings</Text>
+                </TouchableOpacity> */}
+              </View>
+            )}
+
+            {/* Email Add Friend Section - always visible */}
+            <View style={styles.suggestedFriendCard}>
+              <TextInput
+                style={styles.emailInput}
+                placeholder="Enter friend's email"
+                placeholderTextColor="#AAAAAA"
+                value={emailInput}
+                onChangeText={setEmailInput}
+              />
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={handleAddFriendByEmail}
+              >
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               style={[styles.closeButton, { marginTop: 20 }]}
               onPress={() => setSuggestedFriendsModalVisible(false)}
@@ -746,9 +881,10 @@ const styles = StyleSheet.create({
   },
   recipeText: {
     fontSize: 16,
-    marginBottom: 5,
+    marginBottom: 8,
     color: "#1A535C",
-    paddingLeft: 30,
+    paddingLeft: 10,
+    paddingRight: 10,
   },
   closeButton: {
     backgroundColor: "#1A535C",
@@ -797,12 +933,11 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   emailInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
+    flex: 1,
+    borderWidth: 0,
     padding: 10,
-    borderRadius: 5,
-    marginBottom: 15,
-    width: "100%",
+    fontSize: 16,
+    color: "#1A535C",
   },
   friendEmail: { fontSize: 14, color: "#666", marginBottom: 2 },
   profilePictureContainer: { alignItems: "center", marginTop: 20 },
@@ -854,5 +989,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#555",
     marginLeft: 10,
+  },
+  recipesScrollView: {
+    maxHeight: 300,
+    width: "100%",
+    marginBottom: 15,
+  },
+  settingMessageContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 20,
+    width: "100%",
+  },
+  settingMessage: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  settingsButton: {
+    backgroundColor: "#088F8F",
+    padding: 10,
+    borderRadius: 25,
+  },
+  settingsButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginHorizontal: 5,
   },
 });

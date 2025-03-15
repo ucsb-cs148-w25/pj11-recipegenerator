@@ -6,21 +6,117 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { EventRegister } from "react-native-event-listeners";
+
+// Initialize default settings if they don't exist
+export const initializeDefaultSettings = async () => {
+  try {
+    // Check if friendsSuggestionEnabled has been set
+    const friendsSuggestionValue = await AsyncStorage.getItem(
+      "friendsSuggestionEnabled"
+    );
+
+    // If it hasn't been set, set it to true (default)
+    if (friendsSuggestionValue === null) {
+      await AsyncStorage.setItem("friendsSuggestionEnabled", "true");
+      console.log("Initialized friendsSuggestionEnabled to true (default)");
+    }
+
+    // Initialize other settings with defaults as needed
+    const notificationsValue = await AsyncStorage.getItem(
+      "notificationsEnabled"
+    );
+    if (notificationsValue === null) {
+      await AsyncStorage.setItem("notificationsEnabled", "false");
+    }
+
+    const friendsActivityValue = await AsyncStorage.getItem(
+      "friendsActivityEnabled"
+    );
+    if (friendsActivityValue === null) {
+      await AsyncStorage.setItem("friendsActivityEnabled", "false");
+    }
+  } catch (error) {
+    console.error("Error initializing default settings:", error);
+  }
+};
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [friendsSuggestionEnabled, setFriendsSuggestionEnabled] =
-    useState(false);
+    useState(true);
   const [friendsActivityEnabled, setFriendsActivityEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Function to reset tutorial flags in AsyncStorage
+  // Load settings from AsyncStorage on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        // Initialize default settings first
+        await initializeDefaultSettings();
+
+        const notificationsValue = await AsyncStorage.getItem(
+          "notificationsEnabled"
+        );
+        const friendsSuggestionValue = await AsyncStorage.getItem(
+          "friendsSuggestionEnabled"
+        );
+        const friendsActivityValue = await AsyncStorage.getItem(
+          "friendsActivityEnabled"
+        );
+
+        // Set notifications (default to false)
+        setNotificationsEnabled(notificationsValue === "true");
+
+        // Set friends suggestion (default to true if not set)
+        setFriendsSuggestionEnabled(friendsSuggestionValue !== "false");
+
+        // Set friends activity (default to false)
+        setFriendsActivityEnabled(friendsActivityValue === "true");
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error loading settings:", error);
+        setIsLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  const saveSettings = async (key: string, value: boolean) => {
+    try {
+      await AsyncStorage.setItem(key, value.toString());
+      console.log(`Saved setting ${key}: ${value}`);
+
+      EventRegister.emit("settingsChanged", { key, value });
+    } catch (error) {
+      console.error(`Error saving setting ${key}:`, error);
+      Alert.alert("Error", "Failed to save settings. Please try again.");
+    }
+  };
+
+  const handleNotificationsToggle = (value: boolean) => {
+    setNotificationsEnabled(value);
+    saveSettings("notificationsEnabled", value);
+  };
+
+  const handleFriendsSuggestionToggle = (value: boolean) => {
+    setFriendsSuggestionEnabled(value);
+    saveSettings("friendsSuggestionEnabled", value);
+  };
+
+  const handleFriendsActivityToggle = (value: boolean) => {
+    setFriendsActivityEnabled(value);
+    saveSettings("friendsActivityEnabled", value);
+  };
+
   const resetTutorial = async () => {
     try {
       await AsyncStorage.removeItem("hasSeenFridgeTutorial");
 
-      // Simple confirmation
       Alert.alert(
         "Tutorial Reset",
         "The tutorial has been reset. It will appear the next time you visit the Fridge page."
@@ -31,6 +127,14 @@ export default function SettingsPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text>Loading settings...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
@@ -40,7 +144,7 @@ export default function SettingsPage() {
           <Text>Enable Notifications</Text>
           <Switch
             value={notificationsEnabled}
-            onValueChange={(value) => setNotificationsEnabled(value)}
+            onValueChange={handleNotificationsToggle}
             trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
             thumbColor={notificationsEnabled ? "#088F8F" : "#f4f3f4"}
           />
@@ -52,7 +156,7 @@ export default function SettingsPage() {
           <Text>Enable Friends Suggestion</Text>
           <Switch
             value={friendsSuggestionEnabled}
-            onValueChange={(value) => setFriendsSuggestionEnabled(value)}
+            onValueChange={handleFriendsSuggestionToggle}
             trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
             thumbColor={friendsSuggestionEnabled ? "#088F8F" : "#f4f3f4"}
           />
@@ -61,7 +165,7 @@ export default function SettingsPage() {
           <Text>Allow friends to see your activity</Text>
           <Switch
             value={friendsActivityEnabled}
-            onValueChange={(value) => setFriendsActivityEnabled(value)}
+            onValueChange={handleFriendsActivityToggle}
             trackColor={{ false: "#D9D9D9", true: "#ADE1BB" }}
             thumbColor={friendsActivityEnabled ? "#088F8F" : "#f4f3f4"}
           />
@@ -88,6 +192,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: "#F6FFF7",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 32,
