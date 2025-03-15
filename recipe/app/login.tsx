@@ -42,33 +42,38 @@ interface LoginProps {
 
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
-  if (Platform.OS === 'web') {
-    return 'http://localhost:8000';
-  } else if (Platform.OS === 'android') {
+  if (Platform.OS === "web") {
+    return "http://127.0.0.1:8000";
+  } else if (Platform.OS === "android") {
     // Android emulator needs to use 10.0.2.2 to access host machine
-    return 'http://10.0.2.2:8000';
+    return "http://10.0.2.2:8000";
   } else {
     // iOS simulator can use localhost
-    return 'http://localhost:8000';
+    return "http://localhost:8000";
   }
 };
 
 const sendUserDataToBackend = async (user: User) => {
-  // console.log("[Login] Sending user data to backend:", {
-  //   tokenType: user.tokenType,
-  //   hasToken: !!user.token,
-  //   name: user.name,
-  //   email: user.email,
-  //   guest: user.guest
-  // });
+  console.log("[Login] Sending user data to backend:", {
+    tokenType: user.tokenType,
+    hasToken: !!user.token,
+    name: user.name,
+    email: user.email,
+    guest: user.guest,
+  });
 
   try {
     const backendUrl = getBackendUrl();
-    // console.log(`[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`);
-    // console.log("[Login] Making request to /google-login endpoint");
+    console.log(
+      `[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`
+    );
+    console.log("[Login] Making request to /google-login endpoint");
     const response = await fetch(`${backendUrl}/google-login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user?.token}`,
+      },
       body: JSON.stringify(user),
     });
 
@@ -81,19 +86,21 @@ const sendUserDataToBackend = async (user: User) => {
     }
 
     const result = await response.json();
-    // console.log("[Login] Backend response successful:", {
-    //   hasToken: !!result.token,
-    //   tokenLength: result.token?.length
-    // });
+    console.log("[Login] Backend response successful:", {
+      hasToken: !!result.token,
+      tokenLength: result.token?.length,
+    });
 
     try {
       const decoded: any = jwtDecode(result.token);
-      // console.log("[Login] Decoded JWT:", {
-      //   sub: decoded.sub,
-      //   exp: decoded.exp,
-      //   iat: decoded.iat,
-      //   expiresIn: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : 'unknown'
-      // });
+      console.log("[Login] Decoded JWT:", {
+        sub: decoded.sub,
+        exp: decoded.exp,
+        iat: decoded.iat,
+        expiresIn: decoded.exp
+          ? new Date(decoded.exp * 1000).toISOString()
+          : "unknown",
+      });
     } catch (jwtError) {
       console.error("[Login] Error decoding JWT:", jwtError);
     }
@@ -124,7 +131,6 @@ export default function Login({ setUser }: LoginProps) {
 
   // ========== NATIVE SIGN-IN (iOS/Android) ==========
   const nativeSignIn = async () => {
-    // console.log("Pressed native sign in");
     try {
       // Clear any previous user data
       await AsyncStorage.removeItem("hasSeenFridgeTutorial");
@@ -136,20 +142,12 @@ export default function Login({ setUser }: LoginProps) {
       await GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       });
-      // console.log("Attempting native (iOS/Android) Google sign in...");
 
       const info = await GoogleSignin.signIn();
-      // console.log("Native sign in success, info from GoogleSignIn is:", info);
-
       const result = info.data;
-      if (result && result.user) {
-        // Save Google profile picture URL to AsyncStorage immediately
-        if (result.user.photo) {
-          await AsyncStorage.setItem("userPicture", result.user.photo);
-          // console.log("Saved Google profile picture URL:", result.user.photo);
-        }
 
-        // First set user with Google token (temporary)
+      if (result && result.user) {
+        // Exchange Google token for JWT token
         const userData: User = {
           token: result.idToken || undefined,
           tokenType: "idToken",
@@ -158,41 +156,50 @@ export default function Login({ setUser }: LoginProps) {
           picture: result.user.photo || undefined,
         };
 
+        // Set user with Google token (temporary)
         setUser(userData);
 
         try {
           // Exchange Google token for JWT token
-          // console.log("[Login] Exchanging Google token for JWT token");
           const backendResponse = await sendUserDataToBackend(userData);
 
           // After backend authentication, update the user object with the JWT token
           if (backendResponse && backendResponse.token) {
-            // console.log("[Login] Received JWT token from backend");
+            // Decode the JWT to get the user ID
+            const decoded: any = jwtDecode(backendResponse.token);
+            const userId = decoded.sub;
 
             // Store JWT token in AsyncStorage
-            const decoded: any = jwtDecode(backendResponse.token);
             await AsyncStorage.setItem("token", backendResponse.token);
-            await AsyncStorage.setItem("userId", decoded.sub);
+            await AsyncStorage.setItem("userId", userId);
 
-            // Verify token was stored correctly
-            const storedToken = await AsyncStorage.getItem("token");
-            // console.log("[Login] Token stored successfully:", !!storedToken);
-            if (storedToken) {
-              const tokenPreview = storedToken.substring(0, 10) + "...";
-              // console.log(`[Login] Stored token preview: ${tokenPreview}`);
-            } else {
-              console.error("[Login] Failed to store JWT token in AsyncStorage");
+            // Store the Google profile picture with user-specific key
+            if (result.user.photo) {
+              await AsyncStorage.setItem(
+                `userPicture_${userId}`,
+                result.user.photo
+              );
+              console.log(
+                "Saved Google profile picture URL with user ID:",
+                userId
+              );
             }
 
-            // Update user object with JWT token
+            // Check for existing user-specific custom profile picture
+            const customPicture = await AsyncStorage.getItem(
+              `userCustomPicture_${userId}`
+            );
+
+            // Update user object with JWT token and correct profile picture
             const updatedUserData: User = {
               ...userData,
+              userId: userId,
               token: backendResponse.token,
-              tokenType: "jwt" // Change token type to JWT
+              tokenType: "jwt", // Change token type to JWT
+              picture: customPicture || result.user.photo || undefined,
             };
-            setUser(updatedUserData);
 
-            // console.log("[Login] User object updated with JWT token");
+            setUser(updatedUserData);
           } else {
             console.error("[Login] No token received from backend");
           }
@@ -229,10 +236,6 @@ export default function Login({ setUser }: LoginProps) {
     if (response?.type === "success") {
       const { authentication } = response;
       if (authentication?.accessToken) {
-        // console.log(
-        //   "Got access token from Expo AuthSession:",
-        //   authentication.accessToken
-        // );
         handleAuthSession(authentication.accessToken);
       }
     } else if (response?.type === "error") {
@@ -257,13 +260,6 @@ export default function Login({ setUser }: LoginProps) {
         `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
       );
       const user = await res.json();
-      // console.log("User info (Expo AuthSession):", user);
-
-      // Save Google profile picture URL to AsyncStorage immediately
-      if (user.picture) {
-        await AsyncStorage.setItem("userPicture", user.picture);
-        // console.log("Saved Google profile picture URL (web):", user.picture);
-      }
 
       // First set user with Google token (temporary)
       const userData: User = {
@@ -277,37 +273,42 @@ export default function Login({ setUser }: LoginProps) {
 
       try {
         // Exchange Google token for JWT token
-        // console.log("[Login] Exchanging Google token for JWT token");
         const backendResponse = await sendUserDataToBackend(userData);
 
         // After backend authentication, update the user object with the JWT token
         if (backendResponse && backendResponse.token) {
-          // console.log("[Login] Received JWT token from backend");
+          // Decode the JWT to get the user ID
+          const decoded: any = jwtDecode(backendResponse.token);
+          const userId = decoded.sub;
 
           // Store JWT token in AsyncStorage
-          const decoded: any = jwtDecode(backendResponse.token);
           await AsyncStorage.setItem("token", backendResponse.token);
-          await AsyncStorage.setItem("userId", decoded.sub);
+          await AsyncStorage.setItem("userId", userId);
 
-          // Verify token was stored correctly
-          const storedToken = await AsyncStorage.getItem("token");
-          // console.log("[Login] Token stored successfully:", !!storedToken);
-          if (storedToken) {
-            const tokenPreview = storedToken.substring(0, 10) + "...";
-            // console.log(`[Login] Stored token preview: ${tokenPreview}`);
-          } else {
-            console.error("[Login] Failed to store JWT token in AsyncStorage");
+          // Store the Google profile picture with user-specific key
+          if (user.picture) {
+            await AsyncStorage.setItem(`userPicture_${userId}`, user.picture);
+            console.log(
+              "Saved Google profile picture URL with user ID:",
+              userId
+            );
           }
+
+          // Check for existing user-specific custom profile picture
+          const customPicture = await AsyncStorage.getItem(
+            `userCustomPicture_${userId}`
+          );
 
           // Update user object with JWT token
           const updatedUserData: User = {
             ...userData,
+            userId: userId,
             token: backendResponse.token,
-            tokenType: "jwt" // Change token type to JWT
+            tokenType: "jwt", // Change token type to JWT
+            picture: customPicture || user.picture || undefined,
           };
-          setUser(updatedUserData);
 
-          // console.log("[Login] User object updated with JWT token");
+          setUser(updatedUserData);
         } else {
           console.error("[Login] No token received from backend");
         }
@@ -333,7 +334,7 @@ export default function Login({ setUser }: LoginProps) {
     const guestUser: User = {
       guest: true,
       name: "Guest",
-      tokenType: "none" // Explicitly set token type for guests
+      tokenType: "none", // Explicitly set token type for guests
     };
     setUser(guestUser);
 

@@ -3,23 +3,28 @@ import { Platform } from "react-native";
 
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
-  if (Platform.OS === 'web') {
-    return 'http://localhost:8000';
-  } else if (Platform.OS === 'android') {
+  if (Platform.OS === "web") {
+    return "http://127.0.0.1:8000";
+  } else if (Platform.OS === "android") {
     // Android emulator needs to use 10.0.2.2 to access host machine
-    return 'http://10.0.2.2:8000';
+    return "http://10.0.2.2:8000";
   } else {
     // iOS simulator can use localhost
-    return 'http://localhost:8000';
+    return "http://127.0.0.1:8000";
   }
 };
 
-export const apiRequest = async (endpoint: string, method = "GET", body = null): Promise<any> => {
+export const apiRequest = async (
+  endpoint: string,
+  method = "GET",
+  body = null
+): Promise<any> => {
   // console.log(`[API] Starting request to ${endpoint}`);
 
   // Get token and check if user is guest
   const token = await AsyncStorage.getItem("token");
-  const isGuest = await AsyncStorage.getItem("isGuest");
+  const isGuestStr = await AsyncStorage.getItem("isGuest");
+  const isGuest = isGuestStr === "true";
 
   // Check if the token is a Google token or a JWT token
   let isGoogleToken = false;
@@ -44,7 +49,7 @@ export const apiRequest = async (endpoint: string, method = "GET", body = null):
         // console.log(`[API] Waiting for JWT token (attempt ${retryCount + 1}/${maxRetries})...`);
 
         // Wait for 500ms
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Check if token has been updated to JWT
         const newToken = await AsyncStorage.getItem("token");
@@ -64,7 +69,9 @@ export const apiRequest = async (endpoint: string, method = "GET", body = null):
   // Only use JWT tokens for authorization
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(token && !isGuest && isJwtToken ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token && !isGuest && isJwtToken
+      ? { Authorization: `Bearer ${token}` }
+      : {}),
   };
 
   const options: RequestInit = {

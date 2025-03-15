@@ -7,7 +7,7 @@ import Homepage from "./index";
 import FridgePage from "./fridge";
 import RecipePage from "./recipe";
 import ProfilePage from "./profile";
-import SettingsPage from "./settings";
+import SettingsPage, { initializeDefaultSettings } from "./settings";
 
 import Login, { User } from "./login";
 
@@ -16,6 +16,20 @@ const Tab = createBottomTabNavigator();
 export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Initialize app settings on first load
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Initialize default settings
+        await initializeDefaultSettings();
+      } catch (error) {
+        console.error("Error initializing app settings:", error);
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   // Check for existing user session on app start
   useEffect(() => {
