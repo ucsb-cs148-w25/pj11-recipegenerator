@@ -29,14 +29,14 @@ export const initializeDefaultSettings = async () => {
       "notificationsEnabled"
     );
     if (notificationsValue === null) {
-      await AsyncStorage.setItem("notificationsEnabled", "false");
+      await AsyncStorage.setItem("notificationsEnabled", "true");
     }
 
     const friendsActivityValue = await AsyncStorage.getItem(
       "friendsActivityEnabled"
     );
     if (friendsActivityValue === null) {
-      await AsyncStorage.setItem("friendsActivityEnabled", "false");
+      await AsyncStorage.setItem("friendsActivityEnabled", "true");
     }
   } catch (error) {
     console.error("Error initializing default settings:", error);

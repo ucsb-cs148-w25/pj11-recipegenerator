@@ -36,10 +36,10 @@ interface Friend {
 
 // Updates profile picture on the backend
 const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
-  console.log("Sending updated profile to backend:", user);
+  // console.log("Sending updated profile to backend:", user);
   try {
     if (!user.token || user.guest) {
-      console.log("No token available or guest user, skipping backend update");
+      // console.log("No token available or guest user, skipping backend update");
       return true;
     }
     const backendUrl =
@@ -61,7 +61,7 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
       );
     }
     const result = await response.json();
-    console.log("Profile update response:", result);
+    // console.log("Profile update response:", result);
     if (result.profile?.picture) {
       await AsyncStorage.setItem(
         `userPicture_${user.userId}`,
@@ -84,7 +84,7 @@ const fetchUserProfile = async (
   user: User | null
 ): Promise<string | undefined> => {
   if (!user?.token || user.guest) {
-    console.log("No token available or guest user, skipping profile fetch");
+    // console.log("No token available or guest user, skipping profile fetch");
     return undefined;
   }
 
@@ -102,7 +102,7 @@ const fetchUserProfile = async (
     }
 
     const profileData = await response.json();
-    console.log("Fetched profile from backend:", profileData);
+    // console.log("Fetched profile from backend:", profileData);
 
     // If we have a picture URL from the backend, store it and return it
     if (profileData.picture) {
@@ -301,13 +301,13 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     {
       id: "theboss1",
       name: "Tobias Hollerer",
-      email: "hollerer@cs.ucsb.edu",
+      email: "holl@cs.ucsb.edu",
+      picture: "https://cs.ucsb.edu/sites/default/files/styles/person_large_image/public/2020-02/Picture1_3.png?itok=okC0ak_i",
       recipes: [
         "Margherita Pizza",
         "Pumpkin Soup",
         "Grilled Salmon",
         "German Pretzel",
-        "Apple Strudel",
       ],
     },
   ];
@@ -661,15 +661,6 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Debug info - remove in production */}
-      {__DEV__ && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            Profile Picture:{" "}
-            {profilePicture ? profilePicture.substring(0, 30) + "..." : "null"}
-          </Text>
-        </View>
-      )}
       <View style={styles.profilePictureContainer}>
         <Image
           source={
@@ -1205,15 +1196,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginHorizontal: 5,
-  },
-  debugContainer: {
-    padding: 10,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  debugText: {
-    fontSize: 14,
-    color: "#666",
   },
 });
