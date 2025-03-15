@@ -120,7 +120,7 @@ ALGORITHM = your_algorithm     # for jwt, default is HS256
 #### D. Run the Backend Server
 ```bash
 # Make sure you're in the app directory
-uvicorn main:app --reload
+uvicorn backend:app --reload
 ```
 
 - The backend API will be available at `http://localhost:8000`.
@@ -136,3 +136,10 @@ uvicorn main:app --reload
 - **API Keys**: Make sure all required API keys are properly set in the `.env` file.
 - **Port Conflicts**: If port 8000 is already in use, you can specify a different port: `uvicorn main:app --reload --port 8001`.
 - **Expo Connection Issues**: Ensure your mobile device is on the same network as your development machine.
+
+
+
+# Deployment
+Instruction above is how you can run the app version.
+
+Here's the link to the live website: [recipeai.live](recipeai.live)
