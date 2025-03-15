@@ -1,6 +1,22 @@
 ## Shiyuan Wang
 
 - **UI/UX Enhancements:**
+  - **Adding Preferences in Recipe Generation ([PR #164](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/164)):**
+    - Implemented user preferences for favor, allergy, cooking time, difficulty, etc.
+  - **Adding Search Feature in Fridge Page ([PR #162](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/162)):**
+    - Added a search functionality to the `FridgePage` to allow users to search for items.
+  - **Adding Sort and select multiple in Fridge Page ([PR #164](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/164)):**
+    - Implemented sorting functionality with alphabet and quantity preset orders.
+    - Added functionality to select and delete multiple items in the `FridgePage`.
+  - **Introduce Tutorial to the Fridge Page ([PR #164](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/164)):**
+    - Added a tutorial for new users to the `FridgePage`.
+    - Included a reset button for users to relearn the tutorial.
+  - **Adding Image Upload Feature ([PR #165](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/165)):**
+    - Implemented an image upload feature for avatars.
+    - Provided options for default, Google avatar, and self-upload.
+    - Modified backend to handle image upload.
+  - **Implement the Friend Toggle in Setting Page ([PR #163](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/163)):**
+    - Added a toggle in the settings page for users to choose whether they want to see friend suggestions.
   - **Swipe-to-Delete Feature ([PR #146](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/146)):**
     - Added a `SwipeableItem` component to handle swipe gestures and trigger item deletion.
     - Updated the `FridgePage` component to use the new `SwipeableItem` component, including item deletion with undo functionality.
@@ -23,5 +39,6 @@
     - Updated the icon and favicon paths in `app.json`.
   - **Signout Redirect ([PR #77](https://github.com/ucsb-cs148-w25/pj11-recipegenerator/pull/77)):**
     - Made signout redirect the user to the login page.
+
 - **Design Contributions:**
   - Designed desktop website mockups in Figma (note: these mockups were not implemented, as the project focus was on mobile/app development).
