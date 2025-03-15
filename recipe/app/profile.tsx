@@ -39,7 +39,7 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
   // console.log("Sending updated profile to backend:", user);
   try {
     if (!user.token || user.guest) {
-      // console.log("No token available or guest user, skipping backend update");
+      console.log("No token available or guest user, skipping backend update");
       return true;
     }
     const backendUrl =
@@ -84,7 +84,7 @@ const fetchUserProfile = async (
   user: User | null
 ): Promise<string | undefined> => {
   if (!user?.token || user.guest) {
-    // console.log("No token available or guest user, skipping profile fetch");
+    console.log("No token available or guest user, skipping profile fetch");
     return undefined;
   }
 
