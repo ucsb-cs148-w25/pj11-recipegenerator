@@ -1,6 +1,6 @@
 # Recipe Generator
 
-The Recipe Generator App is a mobile application designed to help users organize their kitchen inventory, generate recipes based on available ingredients, track nutritional information, and maintain cooking history.
+The Recipe Generator App is a web application designed to help users organize their kitchen inventory, generate recipes based on available ingredients, track nutritional information, and maintain cooking history.
 
 ## Team Members 
 |    FULL NAME     |    GITHUB ID    |
