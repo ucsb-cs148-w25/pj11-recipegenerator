@@ -63,7 +63,10 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
     const result = await response.json();
     console.log("Profile update response:", result);
     if (result.profile?.picture) {
-      await AsyncStorage.setItem("userPicture", result.profile.picture);
+      await AsyncStorage.setItem(
+        `userPicture_${user.userId}`,
+        result.profile.picture
+      );
       console.log(
         "Updated profile picture in AsyncStorage:",
         result.profile.picture
@@ -73,6 +76,47 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
   } catch (error) {
     console.error("Error sending profile update to backend:", error);
     throw error;
+  }
+};
+
+// Fetch the user profile from backend
+const fetchUserProfile = async (
+  user: User | null
+): Promise<string | undefined> => {
+  if (!user?.token || user.guest) {
+    console.log("No token available or guest user, skipping profile fetch");
+    return undefined;
+  }
+
+  try {
+    const backendUrl =
+      Platform.OS === "web" ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
+    const response = await fetch(`${backendUrl}/user/profile`, {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch profile: ${response.status}`);
+    }
+
+    const profileData = await response.json();
+    console.log("Fetched profile from backend:", profileData);
+
+    // If we have a picture URL from the backend, store it and return it
+    if (profileData.picture) {
+      await AsyncStorage.setItem(
+        `userPicture_${user.userId}`,
+        profileData.picture
+      );
+      return profileData.picture;
+    }
+
+    return undefined;
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return undefined;
   }
 };
 
@@ -90,6 +134,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   );
   const [friendsSuggestionEnabled, setFriendsSuggestionEnabled] =
     useState<boolean>(true);
+  const [imageKey, setImageKey] = useState<number>(0);
 
   // Load settings from AsyncStorage
   useEffect(() => {
@@ -126,31 +171,79 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     };
   }, []);
 
-  // Load stored profile picture if needed
+  // Fetch profile picture from backend on component mount
   useEffect(() => {
-    if (!user?.picture) {
-      AsyncStorage.getItem("userPicture")
-        .then((storedPicture) => {
-          if (storedPicture) {
-            console.log("Found stored profile picture:", storedPicture);
-            setProfilePicture(storedPicture);
-            if (user) {
-              const updatedUser = { ...user, picture: storedPicture };
-              setUser(updatedUser);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Error loading profile picture from storage:", error);
-        });
-    } else {
-      setProfilePicture(user.picture);
-    }
-  }, [user?.picture]);
+    const loadProfilePicture = async () => {
+      if (!user) return;
 
-  useEffect(() => {
-    setProfilePicture(user?.picture);
-  }, [user]);
+      try {
+        console.log(
+          "[ProfileEffect] Loading profile picture for user:",
+          user.userId
+        );
+
+        // First attempt to fetch from backend
+        const backendPicture = await fetchUserProfile(user);
+
+        if (backendPicture) {
+          console.log(
+            "[ProfileEffect] Setting profile picture from backend:",
+            backendPicture
+          );
+          setProfilePicture(backendPicture);
+          if (user) {
+            setUser({ ...user, picture: backendPicture });
+          }
+          return;
+        }
+
+        // If no backend picture, check for user-specific custom picture
+        const storedCustomPicture = await AsyncStorage.getItem(
+          `userCustomPicture_${user.userId}`
+        );
+        if (storedCustomPicture) {
+          console.log(
+            "[ProfileEffect] Using stored custom profile picture:",
+            storedCustomPicture
+          );
+          setProfilePicture(storedCustomPicture);
+          if (user) {
+            setUser({ ...user, picture: storedCustomPicture });
+          }
+          return;
+        }
+
+        // If no custom picture, check for Google picture
+        const storedGooglePicture = await AsyncStorage.getItem(
+          `userPicture_${user.userId}`
+        );
+        if (storedGooglePicture) {
+          console.log(
+            "[ProfileEffect] Using stored Google profile picture:",
+            storedGooglePicture
+          );
+          setProfilePicture(storedGooglePicture);
+          if (user) {
+            setUser({ ...user, picture: storedGooglePicture });
+          }
+          return;
+        }
+
+        // Fallback to user.picture from props if available
+        if (user.picture) {
+          console.log(
+            "[ProfileEffect] Using user.picture from props:",
+            user.picture
+          );
+          setProfilePicture(user.picture);
+        }
+      } catch (error) {
+        console.error("[ProfileEffect] Error loading profile picture:", error);
+      }
+    };
+
+    loadProfilePicture();
+  }, [user?.userId]); // Depend on user.userId to refresh when user changes
 
   // --- Friends Data ---
   // Instead of using a static placeholder, fetch the friend list from backend
@@ -349,16 +442,25 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     setSuggestedFriendsModalVisible(true);
   };
 
-  // --- Sign Out & Profile Picture Functions (unchanged) ---
+  // --- Sign Out & Profile Picture Functions (updated) ---
   const handleSignOut = async () => {
     try {
+      if (user && user.userId) {
+        // Remove user-specific data when signing out
+        await AsyncStorage.removeItem(`token_${user.userId}`);
+        await AsyncStorage.removeItem(`userPicture_${user.userId}`);
+        // Keep userCustomPicture_userId to persist across logins if desired
+        // await AsyncStorage.removeItem(`userCustomPicture_${user.userId}`);
+      }
+
+      // Remove general user data
       await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("userId");
       await AsyncStorage.removeItem("isGuest");
       await AsyncStorage.removeItem("userName");
       await AsyncStorage.removeItem("userEmail");
-      await AsyncStorage.removeItem("userPicture");
       await AsyncStorage.removeItem("hasSeenFridgeTutorial");
+
       if (!user?.guest) {
         try {
           await GoogleSignin.revokeAccess();
@@ -385,15 +487,71 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   };
 
   const handleUseGooglePhoto = async () => {
-    if (user && user.picture) {
+    if (user && user.token) {
       try {
+        console.log("Starting Google photo update process");
         setIsUploading(true);
-        await AsyncStorage.setItem("userPicture", user.picture);
-        console.log("Using Google profile photo:", user.picture);
-        await sendUpdatedProfileToBackend(user);
-        setProfilePicture(user.picture);
-        setIsUploading(false);
-        setIsProfilePictureModalVisible(false);
+        setUploadError(null);
+
+        // First try to get the Google picture from AsyncStorage
+        const googlePicture = await AsyncStorage.getItem(
+          `userPicture_${user.userId}`
+        );
+        console.log("Retrieved Google picture from storage:", googlePicture);
+
+        if (!googlePicture && !user.picture) {
+          console.log("No Google picture available in storage or user object");
+          setUploadError("No Google profile picture available");
+          setIsUploading(false);
+          return;
+        }
+
+        // Use the stored Google picture or the one from user object
+        const pictureToUse = googlePicture || user.picture;
+        console.log("Using picture:", pictureToUse);
+
+        if (pictureToUse) {
+          // Remove any custom picture
+          await AsyncStorage.removeItem(`userCustomPicture_${user.userId}`);
+          console.log("Removed custom picture from storage");
+
+          // Store as user's picture
+          await AsyncStorage.setItem(
+            `userPicture_${user.userId}`,
+            pictureToUse
+          );
+          console.log("Saved Google picture to storage:", pictureToUse);
+
+          // Update backend
+          const updatedUser = { ...user, picture: pictureToUse };
+          console.log(
+            "Updating backend with user:",
+            JSON.stringify(updatedUser, null, 2)
+          );
+          await sendUpdatedProfileToBackend(updatedUser);
+          console.log("Backend update successful");
+
+          // Update state BEFORE closing modal to ensure it's applied
+          console.log("Current profile picture:", profilePicture);
+          setProfilePicture(pictureToUse);
+          console.log("Profile picture state updated to:", pictureToUse);
+          setUser(updatedUser);
+          console.log("User state updated");
+
+          // Force image component to refresh by updating the key
+          setImageKey((prevKey) => prevKey + 1);
+          console.log("Incremented image key to force refresh");
+
+          // Force any pending state updates to be applied
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // Now close the modal
+          setIsUploading(false);
+          setIsProfilePictureModalVisible(false);
+          console.log("Modal closed, update complete");
+        } else {
+          throw new Error("Failed to get valid Google profile picture");
+        }
       } catch (error) {
         console.error("Error setting Google profile picture:", error);
         setUploadError(
@@ -429,18 +587,28 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
         setIsUploading(true);
         setUploadError(null);
         try {
-          if (user) {
-            await AsyncStorage.setItem("userPicture", imageUri);
-            console.log("Saved profile picture to AsyncStorage:", imageUri);
+          if (user && user.userId) {
+            // Store as user-specific custom picture
+            await AsyncStorage.setItem(
+              `userCustomPicture_${user.userId}`,
+              imageUri
+            );
+            console.log(
+              "Saved custom profile picture to AsyncStorage:",
+              imageUri
+            );
             const updatedUser = { ...user, picture: imageUri };
             try {
               await sendUpdatedProfileToBackend(updatedUser);
               setUser(updatedUser);
               setProfilePicture(imageUri);
+              // Force image component to refresh by updating the key
+              setImageKey((prevKey) => prevKey + 1);
+              console.log("Incremented image key to force refresh");
               setIsUploading(false);
               setIsProfilePictureModalVisible(false);
             } catch (error: any) {
-              await AsyncStorage.removeItem("userPicture");
+              await AsyncStorage.removeItem(`userCustomPicture_${user.userId}`);
               throw error;
             }
           }
@@ -461,18 +629,23 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   };
 
   const handleUseDefaultPhoto = async () => {
-    if (user) {
+    if (user && user.userId) {
       try {
         setIsUploading(true);
         setUploadError(null);
-        await AsyncStorage.removeItem("userPicture");
-        console.log("Removed profile picture from AsyncStorage");
+        // Remove user-specific pictures
+        await AsyncStorage.removeItem(`userCustomPicture_${user.userId}`);
+        await AsyncStorage.removeItem(`userPicture_${user.userId}`);
+        console.log("Removed profile pictures from AsyncStorage");
         const updatedUser = { ...user };
         delete updatedUser.picture;
         const success = await sendUpdatedProfileToBackend(updatedUser);
         if (success) {
           setUser(updatedUser);
           setProfilePicture(undefined);
+          // Force image component to refresh by updating the key
+          setImageKey((prevKey) => prevKey + 1);
+          console.log("Incremented image key to force refresh");
           setIsUploading(false);
           setIsProfilePictureModalVisible(false);
         } else {
@@ -488,6 +661,15 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Debug info - remove in production */}
+      {__DEV__ && (
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>
+            Profile Picture:{" "}
+            {profilePicture ? profilePicture.substring(0, 30) + "..." : "null"}
+          </Text>
+        </View>
+      )}
       <View style={styles.profilePictureContainer}>
         <Image
           source={
@@ -496,6 +678,13 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
               : require("../assets/images/defaultprofilepic.png")
           }
           style={styles.iconpic}
+          onLoad={() =>
+            console.log("Image loaded successfully with URI:", profilePicture)
+          }
+          onError={(e) =>
+            console.error("Error loading image:", e.nativeEvent.error)
+          }
+          key={imageKey}
         />
         <TouchableOpacity
           style={styles.changePhotoButton}
@@ -730,14 +919,12 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
                     <Text style={styles.currentPhotoText}>Current Photo</Text>
                   </View>
                 )}
-                {profilePicture && !user?.guest && (
+                {user?.picture && !user?.guest && (
                   <TouchableOpacity
                     style={styles.photoOption}
                     onPress={handleUseGooglePhoto}
                   >
-                    <Text style={styles.photoOptionText}>
-                      Keep Current Photo
-                    </Text>
+                    <Text style={styles.photoOptionText}>Use Google Photo</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -1018,5 +1205,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginHorizontal: 5,
+  },
+  debugContainer: {
+    padding: 10,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  debugText: {
+    fontSize: 14,
+    color: "#666",
   },
 });

@@ -19,6 +19,7 @@ from backend.routers import login
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Import `get_current_user` from `login.py`
 from backend.routers.login import get_current_user, get_user_profile
@@ -389,12 +390,28 @@ def remove_favorite_recipe(recipe: RemoveFavoriteRequest, user_id: str = Depends
 def get_user_profile_info(profile_data = Depends(get_user_profile)):
     """
     Get the current user's profile information from the JWT token.
+    If the user has a stored profile in the database, use that information.
+    Otherwise, use the profile information from the JWT token.
     """
-    return UserProfile(
-        name=profile_data.get("name"),
-        email=profile_data.get("email"),
-        picture=profile_data.get("picture")
-    )
+    user_id = profile_data["user_id"]
+    
+    # Try to find the user's profile in the database
+    stored_profile = user_profiles.find_one({"user_id": user_id})
+    
+    if stored_profile:
+        # Return profile from database if it exists
+        return UserProfile(
+            name=stored_profile.get("name", profile_data.get("name")),
+            email=stored_profile.get("email", profile_data.get("email")),
+            picture=stored_profile.get("picture", profile_data.get("picture"))
+        )
+    else:
+        # Return profile from JWT token if no database profile exists
+        return UserProfile(
+            name=profile_data.get("name"),
+            email=profile_data.get("email"),
+            picture=profile_data.get("picture")
+        )
 
 @app.post("/user/update-profile-picture", response_model=UpdateProfileResponse)
 def update_profile_picture(
@@ -413,7 +430,8 @@ def update_profile_picture(
             {"$set": {
                 "picture": request.picture_url,
                 "name": profile_data.get("name"),
-                "email": profile_data.get("email")
+                "email": profile_data.get("email"),
+                "updated_at": datetime.now()  # Add a timestamp for when the profile was updated
             }},
             upsert=True
         )
