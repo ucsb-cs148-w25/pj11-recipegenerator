@@ -290,7 +290,7 @@ function FridgePage() {
     const newQuantity = editingQuantity[itemName];
     if (newQuantity === "") return;
     try {
-      await apiRequest("/fridge/update_quantity", "POST", {
+      await apiRequest("/fridge/update_quantity", "PUT", {
         name: itemName,
         quantity: parseInt(newQuantity) || 0,
       } as any);
@@ -326,7 +326,7 @@ function FridgePage() {
 
     timersRef.current[itemName] = setTimeout(async () => {
       try {
-        await apiRequest("/fridge/remove", "POST", {
+        await apiRequest("/fridge/remove", "DELETE", {
           name: itemName,
           quantity: 1000000000,
         } as any);
@@ -384,7 +384,7 @@ function FridgePage() {
     try {
       if (currentQuantity > 1) {
         const newQuantity = currentQuantity - 1;
-        await apiRequest("/fridge/update_quantity", "POST", {
+        await apiRequest("/fridge/update_quantity", "PUT", {
           name: itemName,
           quantity: newQuantity,
         } as any);
@@ -410,7 +410,7 @@ function FridgePage() {
   ) => {
     try {
       const newQuantity = currentQuantity + 1;
-      await apiRequest("/fridge/update_quantity", "POST", {
+      await apiRequest("/fridge/update_quantity", "PUT", {
         name: itemName,
         quantity: newQuantity,
       } as any);
@@ -640,7 +640,7 @@ function FridgePage() {
     selectedItems.forEach((itemName) => {
       timersRef.current[itemName] = setTimeout(async () => {
         try {
-          await apiRequest("/fridge/remove", "POST", {
+          await apiRequest("/fridge/remove", "DELETE", {
             name: itemName,
             quantity: 1000000000,
           } as any);
