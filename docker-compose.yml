@@ -8,10 +8,11 @@ services:
     restart: always
     volumes:
       - mongodb_data:/data/db
-    ports:
-      - "27017:27017"
     networks:
       - recipe-network
+    # Only expose MongoDB internally, not to outside world
+    expose:
+      - "27017"
 
   # FastAPI backend
   backend:
@@ -26,6 +27,9 @@ services:
       - ./backend/.env
     networks:
       - recipe-network
+    # Expose port for debugging during development
+    expose:
+      - "8000"
 
   # React Native Expo frontend
   frontend:
@@ -36,6 +40,8 @@ services:
     restart: always
     networks:
       - recipe-network
+    expose:
+      - "80"
 
   # Nginx reverse proxy
   nginx:
@@ -50,13 +56,15 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+      - ./logs/nginx:/var/log/nginx
     depends_on:
       - backend
       - frontend
     networks:
       - recipe-network
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
 
-  # Certbot for SSL certificates (optional)
+  # Certbot for SSL certificates
   certbot:
     image: certbot/certbot
     container_name: recipe-certbot
@@ -64,6 +72,8 @@ services:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - recipe-network
 
 networks:
   recipe-network:

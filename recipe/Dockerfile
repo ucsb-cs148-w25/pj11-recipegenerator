@@ -12,8 +12,8 @@ RUN npm install
 # Copy project files
 COPY . .
 
-# Build the web version of the app
-RUN npm run web:build
+# Export the web version of the app (this is the correct command for Expo)
+RUN npx expo export:web
 
 # Use a lightweight web server to serve the static files
 FROM nginx:alpine
