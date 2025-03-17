@@ -761,7 +761,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          bottom: SCREEN_HEIGHT * 0.30,
+          bottom: SCREEN_HEIGHT * 0.3,
           left: 20,
           right: 20,
         };
@@ -1221,7 +1221,10 @@ function FridgePage() {
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          setModalVisible(false);
+          setIsImageUploading(false); // Reset loading state when modal is closed
+        }}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -1252,7 +1255,10 @@ function FridgePage() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButton}
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setModalVisible(false);
+                  setIsImageUploading(false); // Reset loading state when modal is closed
+                }}
               >
                 <Text style={styles.modalButtonText}>No</Text>
               </TouchableOpacity>
@@ -1275,6 +1281,7 @@ function FridgePage() {
                   }
                   fetchItems();
                   setModalVisible(false);
+                  setIsImageUploading(false); // Reset loading state when modal is closed
                 }}
               >
                 <Text style={styles.modalButtonText}>Yes</Text>
