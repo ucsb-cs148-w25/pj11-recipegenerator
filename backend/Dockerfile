@@ -1,7 +1,7 @@
 # Use Python 3.9 as the base image
 FROM python:3.9-slim
 
-# Set working directory
+# Set working directory initially to /app for copying requirements
 WORKDIR /app
 
 # Set environment variables
@@ -21,5 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Command to run the application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Change working directory to /app/backend
+WORKDIR /app/backend
+
+# Command to run the application - now works with main:app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 

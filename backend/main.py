@@ -15,7 +15,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import login
+from routers import login
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
