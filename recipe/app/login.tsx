@@ -18,6 +18,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
+import { getApiUrl } from "./api";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -42,15 +43,7 @@ interface LoginProps {
 
 // Helper function to get the appropriate backend URL based on platform
 const getBackendUrl = () => {
-  if (Platform.OS === "web") {
-    return "http://127.0.0.1:8000";
-  } else if (Platform.OS === "android") {
-    // Android emulator needs to use 10.0.2.2 to access host machine
-    return "http://10.0.2.2:8000";
-  } else {
-    // iOS simulator can use localhost
-    return "http://localhost:8000";
-  }
+  return ''; // Use relative URLs in all environments
 };
 
 const sendUserDataToBackend = async (user: User) => {
@@ -63,12 +56,8 @@ const sendUserDataToBackend = async (user: User) => {
   });
 
   try {
-    const backendUrl = getBackendUrl();
-    console.log(
-      `[Login] Using backend URL: ${backendUrl}, platform: ${Platform.OS}`
-    );
-    console.log("[Login] Making request to /google-login endpoint");
-    const response = await fetch(`${backendUrl}/google-login`, {
+    // Use the API URL helper to ensure consistent formatting
+    const response = await fetch(getApiUrl("google-login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

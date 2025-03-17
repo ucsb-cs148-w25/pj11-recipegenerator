@@ -15,7 +15,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { FontAwesome } from "@expo/vector-icons";
-import { apiRequest } from "./api";
+import { apiRequest, getApiUrl } from "./api";
 import SwipeableItem from "./SwipeableItem"; // <-- import our custom component
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -493,7 +493,7 @@ function FridgePage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/fridge/load_from_image",
+        getApiUrl("fridge/load_from_image"),
         {
           method: "POST",
           body: formData,
@@ -521,7 +521,7 @@ function FridgePage() {
       Alert.alert("Upload Error", "There was an error uploading the image.");
     } finally {
       // Always reset loading state when done
-      setIsImageUploading(false);
+      setIsImageUpload(false);
       clearTimeout(timeoutId); // Clear the timeout
     }
   };
