@@ -13,7 +13,7 @@ RUN npm install
 COPY . .
 
 # Export the web version of the app (this is the correct command for newer Expo)
-RUN npx expo export
+RUN npx expo export --verbose
 
 # Use a lightweight web server to serve the static files
 FROM nginx:alpine
