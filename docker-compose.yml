@@ -53,7 +53,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/conf.d/recipeai.conf:/etc/nginx/conf.d/recipeai.conf
       - /etc/letsencrypt:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
       - ./logs/nginx:/var/log/nginx
