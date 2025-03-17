@@ -2,6 +2,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { ENV } from '../.env.js';
 
+// Base URL for API requests - empty string means use relative URLs
+// which will work in all environments including production
+export const API_BASE_URL = '';
+
+// Helper function to construct API URLs - use this instead of hardcoding URLs
+export const getApiUrl = (endpoint: string): string => {
+  // Remove leading slash if present to avoid double slashes
+  const path = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+  return `${API_BASE_URL}/${path}`;
+};
+
 // Helper function to get the appropriate backend URL based on environment
 const getBackendUrl = () => {
   // For production deployment, use the API_URL from environment config

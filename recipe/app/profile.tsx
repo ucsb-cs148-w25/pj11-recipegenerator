@@ -17,7 +17,7 @@ import { User } from "./login";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { apiRequest } from "./api"; // our helper for API calls
+import { apiRequest, getApiUrl } from "./api";
 import { useNavigation } from "@react-navigation/native";
 import { EventRegister } from "react-native-event-listeners";
 
@@ -42,9 +42,7 @@ const sendUpdatedProfileToBackend = async (user: User): Promise<boolean> => {
       console.log("No token available or guest user, skipping backend update");
       return true;
     }
-    const backendUrl =
-      Platform.OS === "web" ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
-    const response = await fetch(`${backendUrl}/user/update-profile-picture`, {
+    const response = await fetch(getApiUrl("user/update-profile-picture"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -89,9 +87,7 @@ const fetchUserProfile = async (
   }
 
   try {
-    const backendUrl =
-      Platform.OS === "web" ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
-    const response = await fetch(`${backendUrl}/user/profile`, {
+    const response = await fetch(getApiUrl("user/profile"), {
       headers: {
         Authorization: `Bearer ${user.token}`,
       },
@@ -326,8 +322,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
     }
   }, [friends, friendsSuggestionEnabled]);
 
-  const backendUrl =
-    Platform.OS === "web" ? "http://127.0.0.1:8000" : "http://10.0.2.2:8000";
+  const backendUrl = '';
 
   // --- Friend-related Functions ---
 
@@ -335,7 +330,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const handleRemoveFriend = async (friendId: string) => {
     try {
       const response = await fetch(
-        `${backendUrl}/user/remove_friend?friend_id=${friendId}`,
+        getApiUrl(`user/remove_friend?friend_id=${friendId}`),
         {
           method: "DELETE",
           headers: {
@@ -359,7 +354,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
   const handleAddFriendByEmail = async () => {
     if (!emailInput) return;
     try {
-      const response = await fetch(`${backendUrl}/user/add_friend`, {
+      const response = await fetch(getApiUrl("user/add_friend"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -393,7 +388,7 @@ export default function ProfilePage({ setUser, user }: ProfilePageProps) {
 
       // For regular friends, fetch recipes from the backend
       const response = await fetch(
-        `${backendUrl}/user/friend_favorites?friend_id=${friend.id}`,
+        getApiUrl(`user/friend_favorites?friend_id=${friend.id}`),
         {
           headers: { Authorization: `Bearer ${user?.token}` },
         }
