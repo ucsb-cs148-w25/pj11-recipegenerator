@@ -22,14 +22,14 @@ from dotenv import load_dotenv
 from datetime import datetime
 
 # Import `get_current_user` from `login.py`
-from backend.routers.login import get_current_user, get_user_profile
+from routers.login import get_current_user, get_user_profile
 
 
 # Import the ML functions
-from backend.ML_functions import generate_delicious_recipes, extract_recipe_from_image
+from ML_functions import generate_delicious_recipes, extract_recipe_from_image
 
 # Import the Pydantic models from app/models.py 
-from backend.models import (
+from models import (
     OpeningPageResponse,
     Item, 
     FridgeItem,
