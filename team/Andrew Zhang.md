@@ -1,1 +1,0 @@
-Hi, I'm Andrew Zhang. I'm a double major in applied mathematics and CS. I'm in my third year. I love cooking a lot! (Ask Shiyuan) I hope this application can simply the cooking process and make cooking more efficient.

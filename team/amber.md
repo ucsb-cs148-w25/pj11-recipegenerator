@@ -1,1 +1,0 @@
-This is Amber Wang. I'm a fourth year CS and DS major. Excited to make this recipe generator, generating recipe recommendations based on my ingredients inputted that has left in my fridge. 
