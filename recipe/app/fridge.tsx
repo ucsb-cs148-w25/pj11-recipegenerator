@@ -744,7 +744,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          bottom: 100,
+          bottom: SCREEN_HEIGHT * 0.12,
           left: 20,
           right: 20,
         };
@@ -761,7 +761,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: SCREEN_HEIGHT / 2.6,
+          bottom: SCREEN_HEIGHT * 0.30,
           left: 20,
           right: 20,
         };
@@ -779,7 +779,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          bottom: 140,
+          bottom: SCREEN_HEIGHT * 0.15,
           left: 20,
           right: 20,
         };
@@ -798,7 +798,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: 140,
+          bottom: SCREEN_HEIGHT * 0.51,
           left: 20,
           right: 20,
         };
@@ -816,7 +816,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: 190,
+          bottom: SCREEN_HEIGHT * 0.45,
           left: 20,
           right: 20,
         };
@@ -835,7 +835,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: 190,
+          bottom: SCREEN_HEIGHT * 0.43,
           left: 20,
           right: 20,
         };
@@ -852,7 +852,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: 520,
+          bottom: SCREEN_HEIGHT * 0.3,
           left: 20,
           right: 20,
         };
@@ -871,7 +871,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          bottom: 100,
+          bottom: SCREEN_HEIGHT * 0.12,
           left: 20,
           right: 20,
         };
@@ -892,7 +892,7 @@ function FridgePage() {
           </>
         );
         tooltipPosition = {
-          top: SCREEN_HEIGHT / 3,
+          bottom: SCREEN_HEIGHT * 0.5,
           left: 40,
           right: 40,
         };
