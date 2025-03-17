@@ -1,8 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { ENV } from '../.env.js';
 
-// Helper function to get the appropriate backend URL based on platform
+// Helper function to get the appropriate backend URL based on environment
 const getBackendUrl = () => {
+  // For production deployment, use the API_URL from environment config
+  if (process.env.NODE_ENV === 'production') {
+    return ENV.API_URL;
+  }
+  
+  // For development, use local URLs based on platform
   if (Platform.OS === "web") {
     return "http://127.0.0.1:8000";
   } else if (Platform.OS === "android") {
@@ -13,6 +20,9 @@ const getBackendUrl = () => {
     return "http://127.0.0.1:8000";
   }
 };
+
+// Export the function for use in components
+export { getBackendUrl };
 
 export const apiRequest = async (
   endpoint: string,

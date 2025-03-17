@@ -1,0 +1,11 @@
+requests==2.32.3
+fastapi
+uvicorn
+pymongo
+pydantic
+python-multipart
+requests
+openai
+groq
+python-dotenv
+pyjwt
