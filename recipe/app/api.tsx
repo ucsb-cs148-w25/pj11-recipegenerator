@@ -8,9 +8,8 @@ export const API_BASE_URL = '';
 
 // Helper function to construct API URLs - use this instead of hardcoding URLs
 export const getApiUrl = (endpoint: string): string => {
-  // Remove leading slash if present to avoid double slashes
-  const path = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-  return `${API_BASE_URL}/${path}`;
+  // Always use relative URLs
+  return `/${endpoint}`;
 };
 
 // Helper function to get the appropriate backend URL based on environment
@@ -35,101 +34,51 @@ const getBackendUrl = () => {
 // Export the function for use in components
 export { getBackendUrl };
 
+// Main API request function
 export const apiRequest = async (
   endpoint: string,
-  method = "GET",
-  body = null
-): Promise<any> => {
-  // console.log(`[API] Starting request to ${endpoint}`);
-
-  // Get token and check if user is guest
-  const token = await AsyncStorage.getItem("token");
-  const isGuestStr = await AsyncStorage.getItem("isGuest");
-  const isGuest = isGuestStr === "true";
-
-  // Check if the token is a Google token or a JWT token
-  let isGoogleToken = false;
-  let isJwtToken = false;
-
-  if (token) {
-    isGoogleToken = token.startsWith("ya29.");
-    isJwtToken = token.startsWith("ey");
-
-    // const tokenType = isGoogleToken ? "Google" : (isJwtToken ? "JWT" : "Unknown");
-    // console.log(`[API] Token type: ${tokenType}`);
-
-    if (isGoogleToken) {
-      // console.warn("[API] Google token detected - will not use for API request");
-
-      // Try to wait for JWT token if we have a Google token
-      // This handles the race condition where the JWT token is being set but not yet available
-      let retryCount = 0;
-      const maxRetries = 3;
-
-      while (isGoogleToken && retryCount < maxRetries) {
-        // console.log(`[API] Waiting for JWT token (attempt ${retryCount + 1}/${maxRetries})...`);
-
-        // Wait for 500ms
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Check if token has been updated to JWT
-        const newToken = await AsyncStorage.getItem("token");
-        if (newToken && newToken.startsWith("ey")) {
-          // console.log("[API] JWT token now available, will use for request");
-          isJwtToken = true;
-          isGoogleToken = false;
-          return apiRequest(endpoint, method, body); // Retry with new token
-        }
-
-        retryCount++;
-      }
-    }
-  }
-
-  // Don't include auth token for guest users or if using Google token
-  // Only use JWT tokens for authorization
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(token && !isGuest && isJwtToken
-      ? { Authorization: `Bearer ${token}` }
-      : {}),
-  };
-
-  const options: RequestInit = {
-    method,
-    headers,
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  };
-
-  const backendUrl = getBackendUrl();
-  // console.log(`[API] Request to ${backendUrl}${endpoint} with auth: ${!!headers.Authorization}`);
-
+  method: string = "GET",
+  body: any = null
+) => {
   try {
-    const response = await fetch(`${backendUrl}${endpoint}`, options);
-
-    if (response.status === 401) {
-      console.error("[API] Unauthorized - Invalid or expired token");
-
-      // Try to get error details
-      try {
-        const errorBody = await response.clone().json();
-        console.error("[API] Error details:", errorBody);
-      } catch (e) {
-        // Ignore error parsing errors
-      }
-
-      // Only clear tokens if we're getting 401 with a JWT token
-      // This prevents clearing tokens during the login process
-      if (isJwtToken) {
-        // console.log("[API] Clearing invalid JWT token from storage");
-        await AsyncStorage.removeItem("token");
-        await AsyncStorage.removeItem("userId");
-      }
+    const token = await AsyncStorage.getItem("token");
+    const isGuest = await AsyncStorage.getItem("isGuest");
+    
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    // Only add Authorization header if token exists and not a guest
+    if (token && isGuest !== "true") {
+      headers["Authorization"] = `Bearer ${token}`;
     }
-
-    return await response.json();
+    
+    const options: RequestInit = {
+      method,
+      headers,
+    };
+    
+    if (body && method !== "GET") {
+      options.body = JSON.stringify(body);
+    }
+    
+    // Use relative URLs for all requests
+    const response = await fetch(getApiUrl(endpoint), options);
+    
+    // Handle potential errors
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ 
+        error: `HTTP error ${response.status}` 
+      }));
+      throw new Error(
+        errorData.detail || errorData.error || `API request failed: ${response.status}`
+      );
+    }
+    
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error(`[API] Error during fetch:`, error);
+    console.error(`API request error (${endpoint}):`, error);
     throw error;
   }
 };
