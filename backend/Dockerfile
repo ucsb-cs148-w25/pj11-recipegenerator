@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Change working directory to /app/backend
-WORKDIR /app/backend
+WORKDIR /app
 
 # Command to run the application - now works with main:app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
