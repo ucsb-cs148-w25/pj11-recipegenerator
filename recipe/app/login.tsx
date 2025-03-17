@@ -56,8 +56,8 @@ const sendUserDataToBackend = async (user: User) => {
   });
 
   try {
-    // Use relative URL with proper formatting
-    const response = await fetch(`/google-login`, {
+    // Use the API URL helper to ensure consistent formatting
+    const response = await fetch(getApiUrl("google-login"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
