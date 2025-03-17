@@ -8,6 +8,8 @@ __pycache__/
 *.so
 *.ipynb
 
+app/
+
 # Distribution / packaging
 .Python
 build/
